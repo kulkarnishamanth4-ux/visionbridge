@@ -25,6 +25,10 @@ const SpeechModule = (() => {
   let audioUnlocked = false;
   let chromeResumeInterval = null;
 
+  // --- Translation ---
+  let currentLang = 'en';
+  const translateCache = new Map();
+
   // --- Audio Context for beep alerts ---
   let audioCtx = null;
 
@@ -181,7 +185,7 @@ const SpeechModule = (() => {
     return voices;
   }
 
-  function speak(text, priority = PRIORITY.DESCRIPTION) {
+  async function speak(text, priority = PRIORITY.DESCRIPTION) {
     if (!synth) return;
 
     // Danger priority: interrupt everything
@@ -191,10 +195,39 @@ const SpeechModule = (() => {
       currentUtterance = null;
     }
 
-    speechQueue.push({ text, priority });
+    // Auto-translate if non-English language is selected
+    let finalText = text;
+    if (currentLang && currentLang !== 'en' && text && text.length > 1) {
+      finalText = await translateText(text, currentLang);
+    }
+
+    speechQueue.push({ text: finalText, priority });
     speechQueue.sort((a, b) => b.priority - a.priority);
 
     processQueue();
+  }
+
+  async function translateText(text, lang) {
+    const cacheKey = `${lang}:${text}`;
+    if (translateCache.has(cacheKey)) return translateCache.get(cacheKey);
+    try {
+      const res = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, targetLang: lang })
+      });
+      const data = await res.json();
+      const translated = data.translated || text;
+      translateCache.set(cacheKey, translated);
+      // Keep cache size under control
+      if (translateCache.size > 200) {
+        const first = translateCache.keys().next().value;
+        translateCache.delete(first);
+      }
+      return translated;
+    } catch {
+      return text; // fallback to original on error
+    }
   }
 
   function processQueue() {
@@ -255,13 +288,15 @@ const SpeechModule = (() => {
   function setRate(rate) { speechRate = rate; }
 
   function setLanguage(langCode) {
+    currentLang = langCode;
+    translateCache.clear(); // Clear cache when language changes
     const allVoices = synth.getVoices();
     const match = allVoices.find(v => v.lang.startsWith(langCode)) || null;
     if (match) {
       selectedVoice = match;
       console.log('[Speech] Language set to:', match.lang, match.name);
     } else {
-      console.warn('[Speech] No voice found for language:', langCode);
+      console.warn('[Speech] No voice found for language:', langCode, '- will still translate text');
     }
   }
 

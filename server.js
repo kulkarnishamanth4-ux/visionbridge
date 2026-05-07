@@ -1,4 +1,4 @@
-﻿require('dotenv').config();
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { GoogleGenAI } = require('@google/genai');
@@ -452,6 +452,38 @@ app.post('/api/ask', async (req, res) => {
     res.status(200).json({
       answer: 'The AI service is loading. Please try asking again in a few seconds.'
     });
+  }
+});
+
+// ========== TRANSLATION ENDPOINT ==========
+app.post('/api/translate', async (req, res) => {
+  const { text, targetLang } = req.body;
+  if (!text || !targetLang) return res.status(400).json({ error: 'text and targetLang required' });
+  if (targetLang === 'en') return res.json({ translated: text });
+
+  const langNames = {
+    hi: 'Hindi', es: 'Spanish', fr: 'French', de: 'German', ja: 'Japanese',
+    ko: 'Korean', zh: 'Chinese (Simplified)', ar: 'Arabic', pt: 'Portuguese',
+    ta: 'Tamil', te: 'Telugu', kn: 'Kannada', ru: 'Russian', it: 'Italian'
+  };
+  const langName = langNames[targetLang] || targetLang;
+
+  try {
+    const client = getGenAI();
+    if (!client) return res.json({ translated: text });
+
+    const response = await callWithFallback(client, {
+      contents: [{
+        role: 'user',
+        parts: [{ text: `Translate the following text to ${langName}. Return ONLY the translated text, nothing else. Do not add quotes or explanations.\n\n${text}` }]
+      }]
+    });
+
+    const translated = response.text?.trim() || text;
+    res.json({ translated });
+  } catch (err) {
+    console.warn('[Translate] Error:', err.message?.slice(0, 80));
+    res.json({ translated: text }); // Fallback to original
   }
 });
 
