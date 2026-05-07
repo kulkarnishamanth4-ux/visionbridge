@@ -1,7 +1,11 @@
 /**
  * app.js — Main VisionGuard application controller
- * Orchestrates camera, speech, API, and UI modules.
- * Supports 4 analysis modes: Detailed, Danger, Summary, Measure.
+ * 
+ * HYBRID ARCHITECTURE:
+ * - PRIMARY: TensorFlow.js COCO-SSD runs locally in the browser (always works)
+ * - OPTIONAL: Gemini API adds richer descriptions when available
+ * 
+ * The app NEVER stops working, even if the API is down.
  */
 (async function VisionGuardApp() {
   'use strict';
@@ -12,21 +16,20 @@
   let scanInterval = 6000;
   let isProcessing = false;
   let cameraPreviewVisible = false;
-  let currentMode = 'detailed'; // detailed | danger | summary | measure
+  let currentMode = 'detailed';
+  let localDetectorReady = false;
+  let geminiAvailable = false;
 
   // --- Initialization ---
   const status = await ApiModule.checkStatus();
+  geminiAvailable = status.apiKeyConfigured;
   UIModule.setApiStatus(status.apiKeyConfigured);
-
-  if (!status.apiKeyConfigured) {
-    console.warn('VisionGuard: API key not configured.');
-  }
 
   const voices = await SpeechModule.initSynthesis();
   const enVoices = voices.filter(v => v.lang.startsWith('en'));
   UIModule.populateVoices(voices);
 
-  // --- Mode Descriptions (spoken on switch) ---
+  // --- Mode Descriptions ---
   const MODE_NAMES = {
     detailed: 'Detailed mode. Full scene description with danger alerts.',
     danger: 'Danger mode. Only immediate, close-range threats.',
@@ -39,21 +42,14 @@
     tab.addEventListener('click', () => {
       const mode = tab.dataset.mode;
       if (mode === currentMode) return;
-
       currentMode = mode;
-
-      // Update tab UI
       document.querySelectorAll('.mode-tab').forEach(t => {
         t.classList.remove('active');
         t.setAttribute('aria-selected', 'false');
       });
       tab.classList.add('active');
       tab.setAttribute('aria-selected', 'true');
-
-      // Announce mode change
       SpeechModule.speak(MODE_NAMES[mode], SpeechModule.PRIORITY.INFO);
-
-      console.log('[App] Mode switched to:', mode);
     });
   });
 
@@ -62,24 +58,45 @@
     UIModule.hideOnboarding();
     SpeechModule.unlockAudio();
 
+    // Start camera
     const camResult = await CameraModule.startCamera();
     if (camResult.success) {
-      SpeechModule.speak('Welcome to VisionGuard. Your camera is active. Select a mode above, then tap Scan.', SpeechModule.PRIORITY.INFO);
+      SpeechModule.speak('Welcome to VisionGuard. Loading object detection model...', SpeechModule.PRIORITY.INFO);
     } else {
-      SpeechModule.speak('Welcome to VisionGuard. I could not access your camera. Please grant camera permission and reload.', SpeechModule.PRIORITY.INFO);
+      SpeechModule.speak('Could not access camera. Please grant permission and reload.', SpeechModule.PRIORITY.INFO);
+      return;
     }
 
+    // Load local TF.js model in background
+    loadLocalDetector();
+
+    // Start speech recognition
     if (SpeechModule.isSupported) {
       SpeechModule.startListening();
     }
   });
 
-  // --- Event: Scan Button ---
-  UIModule.els.btnScan.addEventListener('click', () => {
-    performScan();
-  });
+  async function loadLocalDetector() {
+    try {
+      UIModule.setMode('scanning');
+      UIModule.els.statusLabel.textContent = 'Loading AI...';
+      localDetectorReady = await DetectorModule.init();
+      if (localDetectorReady) {
+        SpeechModule.speak('Object detection ready. Tap Scan to analyze your surroundings.', SpeechModule.PRIORITY.INFO);
+        UIModule.setMode('idle');
+      } else {
+        SpeechModule.speak('Local detection could not load. I will use the cloud AI instead.', SpeechModule.PRIORITY.INFO);
+        UIModule.setMode('idle');
+      }
+    } catch (err) {
+      console.error('Detector init failed:', err);
+      UIModule.setMode('idle');
+    }
+  }
 
-  // Keyboard: Space to scan
+  // --- Event: Scan Button ---
+  UIModule.els.btnScan.addEventListener('click', () => performScan());
+
   document.addEventListener('keydown', (e) => {
     if (e.code === 'Space' && !e.target.matches('input, select, textarea, button')) {
       e.preventDefault();
@@ -90,10 +107,9 @@
   // --- Event: Ask Button ---
   UIModule.els.btnListen.addEventListener('click', () => {
     if (!SpeechModule.isSupported) {
-      SpeechModule.speak('Voice recognition is not supported in this browser. Please use Chrome or Edge.', SpeechModule.PRIORITY.INFO);
+      SpeechModule.speak('Voice recognition is not supported in this browser.', SpeechModule.PRIORITY.INFO);
       return;
     }
-
     SpeechModule.speak('What would you like to know?', SpeechModule.PRIORITY.INFO);
     UIModule.setMode('listening');
     UIModule.setListenActive(true);
@@ -104,7 +120,6 @@
   UIModule.els.btnAuto.addEventListener('click', () => {
     autoScanEnabled = !autoScanEnabled;
     UIModule.setAutoActive(autoScanEnabled);
-
     if (autoScanEnabled) {
       SpeechModule.speak('Continuous scanning enabled.', SpeechModule.PRIORITY.INFO);
       startAutoScan();
@@ -114,7 +129,7 @@
     }
   });
 
-  // --- Event: Settings ---
+  // --- Settings Events ---
   UIModule.els.btnSettings.addEventListener('click', () => UIModule.showSettings());
   UIModule.els.closeSettings.addEventListener('click', () => UIModule.hideSettings());
   UIModule.els.settingsBackdrop.addEventListener('click', () => UIModule.hideSettings());
@@ -151,7 +166,7 @@
     UIModule.toggleCameraPreview(cameraPreviewVisible);
   });
 
-  // --- Wake Word Callback ---
+  // --- Wake Word ---
   SpeechModule.onWakeWord(() => {
     SpeechModule.stopSpeaking();
     SpeechModule.speak('I\'m listening. What would you like to know?', SpeechModule.PRIORITY.DESCRIPTION);
@@ -159,24 +174,34 @@
     UIModule.setListenActive(true);
   });
 
-  // --- Question Received Callback ---
+  // --- Question Received ---
   SpeechModule.onTranscript(async (question) => {
     UIModule.setListenActive(false);
     UIModule.setMode('scanning');
-
     SpeechModule.speak('Let me look...', SpeechModule.PRIORITY.INFO);
 
     const frame = CameraModule.captureFrame();
     if (!frame) {
-      SpeechModule.speak('I cannot see anything. The camera may not be active.', SpeechModule.PRIORITY.DESCRIPTION);
+      SpeechModule.speak('Camera not active.', SpeechModule.PRIORITY.DESCRIPTION);
       UIModule.setMode('idle');
       return;
     }
 
-    const result = await ApiModule.askQuestion(frame, question);
-    UIModule.addQA(question, result.answer);
-    UIModule.setMode('speaking');
-    SpeechModule.speak(result.answer, SpeechModule.PRIORITY.DESCRIPTION);
+    // Try Gemini for Q&A (local detector can't answer arbitrary questions)
+    if (geminiAvailable) {
+      const result = await ApiModule.askQuestion(frame, question);
+      UIModule.addQA(question, result.answer);
+      UIModule.setMode('speaking');
+      SpeechModule.speak(result.answer, SpeechModule.PRIORITY.DESCRIPTION);
+    } else {
+      // Fall back to local detection description
+      const video = document.getElementById('camera-feed');
+      const localObjs = await DetectorModule.detect(video);
+      const localResult = DetectorModule.processForSpeech(localObjs, 'detailed');
+      const answer = localResult.description || 'I can detect objects but cannot answer specific questions without the AI service.';
+      UIModule.addQA(question, answer);
+      SpeechModule.speak(answer, SpeechModule.PRIORITY.DESCRIPTION);
+    }
   });
 
   // --- Speech Callbacks ---
@@ -193,7 +218,7 @@
   });
 
   // ==========================================
-  // ===  CORE SCAN LOGIC (mode-aware)  ===
+  //    CORE SCAN — LOCAL FIRST, API OPTIONAL
   // ==========================================
 
   async function performScan() {
@@ -203,125 +228,172 @@
     UIModule.setMode('scanning');
     UIModule.showScanAnimation();
 
-    const frame = CameraModule.captureFrame();
-    if (!frame) {
-      SpeechModule.speak('Camera is not available. Please make sure camera access is granted.', SpeechModule.PRIORITY.DESCRIPTION);
+    const video = document.getElementById('camera-feed');
+    if (!video || !video.videoWidth) {
+      SpeechModule.speak('Camera is not available.', SpeechModule.PRIORITY.DESCRIPTION);
       isProcessing = false;
       UIModule.setMode('idle');
       return;
     }
 
     if (currentMode === 'measure') {
-      await performMeasureScan(frame);
+      await performMeasureScan(video);
     } else {
-      await performStandardScan(frame);
+      await performStandardScan(video);
     }
 
     isProcessing = false;
   }
 
-  // --- Standard scan (Detailed, Danger, Summary modes) ---
-  async function performStandardScan(frame) {
-    const result = await ApiModule.analyzeScene(frame, currentMode);
+  // --- Standard Scan: local detection + optional Gemini enhancement ---
+  async function performStandardScan(video) {
+    // STEP 1: Always run local detection (instant, never fails)
+    let localResult = null;
+    if (localDetectorReady) {
+      const localObjs = await DetectorModule.detect(video);
+      localResult = DetectorModule.processForSpeech(localObjs, currentMode);
 
-    // --- DANGER MODE: speak only dangers ---
-    if (currentMode === 'danger') {
-      if (result.dangers && result.dangers.length > 0) {
+      // Show dangers IMMEDIATELY from local detection
+      if (localResult.dangers && localResult.dangers.length > 0) {
         UIModule.setMode('danger');
-        UIModule.showDangers(result.dangers);
+        UIModule.showDangers(localResult.dangers);
 
-        SpeechModule.playDangerBeep();
-        const dangerText = result.dangers.map(d => {
-          const dist = d.distance ? ` ${d.distance}` : '';
-          return `${d.description}${dist}, ${d.direction}`;
-        }).join('. ');
-        SpeechModule.speak('Danger! ' + dangerText, SpeechModule.PRIORITY.DANGER);
+        const critical = localResult.dangers.filter(d => d.severity === 'critical');
+        if (critical.length > 0) {
+          SpeechModule.playDangerBeep();
+          SpeechModule.speak('Warning! ' + critical.map(d => d.description).join('. '), SpeechModule.PRIORITY.DANGER);
+        }
       } else {
         UIModule.showDangers([]);
-        const safeMsg = result.summary || 'No immediate dangers detected. Path appears clear.';
-        UIModule.addDescription(safeMsg);
-        SpeechModule.speak(safeMsg, SpeechModule.PRIORITY.DESCRIPTION);
       }
-      return;
     }
 
-    // --- SUMMARY MODE: speak only summary ---
-    if (currentMode === 'summary') {
-      const summaryText = result.summary || result.description || 'Could not generate summary.';
-      UIModule.addDescription(summaryText);
-      SpeechModule.speak(summaryText, SpeechModule.PRIORITY.DESCRIPTION);
-      return;
+    // STEP 2: Try Gemini for richer description (non-blocking, optional)
+    let geminiResult = null;
+    if (geminiAvailable) {
+      try {
+        const frame = CameraModule.captureFrame();
+        if (frame) {
+          // Fire API call but don't wait forever — use a 15s race
+          geminiResult = await Promise.race([
+            ApiModule.analyzeScene(frame, currentMode),
+            new Promise(resolve => setTimeout(() => resolve(null), 15000))
+          ]);
+        }
+      } catch (err) {
+        console.warn('[Scan] Gemini enhancement failed:', err.message);
+      }
     }
 
-    // --- DETAILED MODE: full description + dangers ---
-    if (result.dangers && result.dangers.length > 0) {
-      UIModule.setMode('danger');
-      UIModule.showDangers(result.dangers);
+    // STEP 3: Decide what to show and speak
+    const hasGemini = geminiResult && geminiResult.description && !geminiResult._cached
+      && !geminiResult.description.includes('AI service');
 
-      const criticalDangers = result.dangers.filter(d => d.severity === 'critical');
-      if (criticalDangers.length > 0) {
-        SpeechModule.playDangerBeep();
-        const dangerText = 'Warning! ' + criticalDangers.map(d => d.description).join('. ');
-        SpeechModule.speak(dangerText, SpeechModule.PRIORITY.DANGER);
-      }
-
-      const warnings = result.dangers.filter(d => d.severity !== 'critical');
-      if (warnings.length > 0) {
-        const warnText = 'Also be aware: ' + warnings.map(d => d.description).join('. ');
-        SpeechModule.speak(warnText, SpeechModule.PRIORITY.DESCRIPTION);
-      }
+    if (currentMode === 'danger') {
+      handleDangerResult(localResult, geminiResult, hasGemini);
+    } else if (currentMode === 'summary') {
+      handleSummaryResult(localResult, geminiResult, hasGemini);
     } else {
-      UIModule.showDangers([]);
-    }
-
-    if (result.description) {
-      UIModule.addDescription(result.description);
-      SpeechModule.speak(result.description, SpeechModule.PRIORITY.DESCRIPTION);
-    } else if (result.summary) {
-      UIModule.addDescription(result.summary);
-      SpeechModule.speak(result.summary, SpeechModule.PRIORITY.DESCRIPTION);
+      handleDetailedResult(localResult, geminiResult, hasGemini);
     }
   }
 
-  // --- Measure scan: capture two frames ~1s apart, send both for comparison ---
-  async function performMeasureScan(frame1) {
+  function handleDangerResult(local, gemini, hasGemini) {
+    if (hasGemini && gemini.dangers && gemini.dangers.length > 0) {
+      // Use Gemini's richer danger descriptions
+      UIModule.setMode('danger');
+      UIModule.showDangers(gemini.dangers);
+      SpeechModule.playDangerBeep();
+      const text = gemini.dangers.map(d => `${d.description}, ${d.direction}`).join('. ');
+      SpeechModule.speak('Danger! ' + text, SpeechModule.PRIORITY.DANGER);
+    } else if (local && local.dangers && local.dangers.length > 0) {
+      // Already spoken by local detection above
+    } else {
+      const msg = (hasGemini && gemini.summary) ? gemini.summary
+        : (local ? local.summary : 'No immediate dangers detected. Path appears clear.');
+      UIModule.addDescription(msg);
+      SpeechModule.speak(msg, SpeechModule.PRIORITY.DESCRIPTION);
+    }
+  }
+
+  function handleSummaryResult(local, gemini, hasGemini) {
+    const text = hasGemini ? (gemini.summary || gemini.description)
+      : (local ? local.summary : 'Could not generate summary.');
+    UIModule.addDescription(text);
+    SpeechModule.speak(text, SpeechModule.PRIORITY.DESCRIPTION);
+  }
+
+  function handleDetailedResult(local, gemini, hasGemini) {
+    if (hasGemini) {
+      // Gemini gave a good response — use its richer description
+      if (gemini.dangers && gemini.dangers.length > 0) {
+        UIModule.setMode('danger');
+        UIModule.showDangers(gemini.dangers);
+        const critical = gemini.dangers.filter(d => d.severity === 'critical');
+        if (critical.length > 0) {
+          SpeechModule.playDangerBeep();
+          SpeechModule.speak('Warning! ' + critical.map(d => d.description).join('. '), SpeechModule.PRIORITY.DANGER);
+        }
+      }
+      UIModule.addDescription(gemini.description);
+      SpeechModule.speak(gemini.description, SpeechModule.PRIORITY.DESCRIPTION);
+    } else if (local) {
+      // Use local detection result
+      if (local.description) {
+        UIModule.addDescription(local.description);
+        SpeechModule.speak(local.description, SpeechModule.PRIORITY.DESCRIPTION);
+      } else {
+        UIModule.addDescription(local.summary);
+        SpeechModule.speak(local.summary, SpeechModule.PRIORITY.DESCRIPTION);
+      }
+    } else {
+      SpeechModule.speak('Could not analyze the scene. Please try again.', SpeechModule.PRIORITY.DESCRIPTION);
+    }
+  }
+
+  // --- Measure Scan: local object detection with size + speed ---
+  async function performMeasureScan(video) {
+    if (!localDetectorReady) {
+      SpeechModule.speak('Object detection model is still loading. Please wait.', SpeechModule.PRIORITY.INFO);
+      isProcessing = false;
+      return;
+    }
+
     SpeechModule.speak('Measuring objects. Hold steady...', SpeechModule.PRIORITY.INFO);
 
-    // Wait 1 second, then capture second frame
+    // First detection
+    await DetectorModule.detect(video);
+
+    // Wait 1 second for motion comparison
     await new Promise(r => setTimeout(r, 1000));
-    const frame2 = CameraModule.captureFrame();
 
-    const result = await ApiModule.measureScene(frame1, frame2);
+    // Second detection (motion tracked automatically)
+    const objects = await DetectorModule.detect(video);
 
-    // Build spoken output
-    if (result.objects && result.objects.length > 0) {
-      // Build HTML for output card
-      const objectsHTML = result.objects.map(obj => {
+    if (objects && objects.length > 0) {
+      const objectsHTML = objects.map(obj => {
         const movingClass = obj.moving ? 'measure-moving' : 'measure-stationary';
-        const movingLabel = obj.moving ? `Moving ${obj.direction || ''} at ${obj.speed}` : 'Stationary';
+        const motionLabel = obj.moving ? `Moving ${obj.moveDir} at ${obj.speed}` : 'Stationary';
         return `
           <li class="measure-object">
-            <div class="measure-name">${obj.name}</div>
+            <div class="measure-name">${obj.label} (${obj.confidence}%)</div>
             <div class="measure-details">
               <span class="measure-detail-label">Size:</span><span>${obj.size}</span>
               <span class="measure-detail-label">Distance:</span><span>${obj.distance}</span>
-              <span class="measure-detail-label">Motion:</span><span class="${movingClass}">${movingLabel}</span>
+              <span class="measure-detail-label">Motion:</span><span class="${movingClass}">${motionLabel}</span>
             </div>
           </li>`;
       }).join('');
 
       UIModule.addDescription(`<ul class="measure-objects">${objectsHTML}</ul>`, true);
 
-      // Speak summary
-      const spokenSummary = result.summary || result.objects.map(o =>
-        `${o.name}: ${o.size}, ${o.distance} away, ${o.moving ? 'moving ' + (o.speed || '') : 'stationary'}`
+      const spoken = objects.map(o =>
+        `${o.label}, about ${o.distance} away, ${o.moving ? 'moving ' + o.moveDir + ' at ' + o.speed : 'stationary'}`
       ).join('. ');
-
-      SpeechModule.speak(spokenSummary, SpeechModule.PRIORITY.DESCRIPTION);
+      SpeechModule.speak(spoken, SpeechModule.PRIORITY.DESCRIPTION);
     } else {
-      const fallbackText = result.summary || 'No objects could be measured.';
-      UIModule.addDescription(fallbackText);
-      SpeechModule.speak(fallbackText, SpeechModule.PRIORITY.DESCRIPTION);
+      UIModule.addDescription('No objects detected for measurement.');
+      SpeechModule.speak('No objects detected to measure.', SpeechModule.PRIORITY.DESCRIPTION);
     }
   }
 
