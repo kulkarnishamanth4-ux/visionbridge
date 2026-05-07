@@ -1,5 +1,5 @@
-/**
- * detector.js — Local object detection using TensorFlow.js + COCO-SSD
+﻿/**
+ * detector.js â€” Local object detection using TensorFlow.js + COCO-SSD
  * Runs ENTIRELY in the browser. No API calls. No rate limits. Always works.
  * 
  * Capabilities:
@@ -17,7 +17,7 @@ const DetectorModule = (() => {
 
   // --- Danger classification ---
   const DANGER_OBJECTS = {
-    // Critical — moving vehicles
+    // Critical â€” moving vehicles
     car: { severity: 'critical', type: 'vehicle', label: 'Car' },
     truck: { severity: 'critical', type: 'vehicle', label: 'Truck' },
     bus: { severity: 'critical', type: 'vehicle', label: 'Bus' },
@@ -58,15 +58,15 @@ const DetectorModule = (() => {
   // Estimate distance from bounding box height vs known real height
   function estimateDistance(className, bboxH, canvasH) {
     const knownH = KNOWN_HEIGHTS[className] || 1.0;
-    // Rough pinhole camera model: distance ≈ (knownH × canvasH) / (bboxH × 2)
+    // Rough pinhole camera model: distance â‰ˆ (knownH Ã— canvasH) / (bboxH Ã— 2)
     // The "2" is a rough focal length factor for phone cameras
     const dist = (knownH * canvasH) / (bboxH * 2.0);
-    return Math.max(0.3, Math.min(dist, 50)); // Clamp 0.3m – 50m
+    return Math.max(0.3, Math.min(dist, 50)); // Clamp 0.3m â€“ 50m
   }
 
   // Estimate approximate size from bounding box proportions + known sizes
   function estimateSize(className, bboxW, bboxH, distance, canvasW, canvasH) {
-    // Real size ≈ bbox fraction × distance × field-of-view factor
+    // Real size â‰ˆ bbox fraction Ã— distance Ã— field-of-view factor
     const fovFactor = 1.2; // approximate for phone cameras
     const realW = (bboxW / canvasW) * distance * fovFactor;
     const realH = (bboxH / canvasH) * distance * fovFactor;
@@ -84,7 +84,7 @@ const DetectorModule = (() => {
       console.log('[Detector] Loading COCO-SSD model...');
       model = await cocoSsd.load({ base: 'lite_mobilenet_v2' }); // Fastest variant
       isReady = true;
-      console.log('[Detector] Model loaded — local detection ready!');
+      console.log('[Detector] Model loaded â€” local detection ready!');
     } catch (err) {
       console.error('[Detector] Failed to load model:', err);
       isReady = false;
@@ -133,7 +133,7 @@ const DetectorModule = (() => {
 
           if (displacement > 0.02) { // Moved more than 2% of frame
             moving = true;
-            // Estimate speed: displacement in frame × distance ÷ time
+            // Estimate speed: displacement in frame Ã— distance Ã· time
             const realDisplacement = displacement * distanceM * 1.5;
             const speedMS = realDisplacement / dt;
             const speedKMH = Math.round(speedMS * 3.6);
@@ -160,7 +160,7 @@ const DetectorModule = (() => {
         direction,
         distance: `${distanceM.toFixed(1)}m / ${distanceFt}ft`,
         distanceM,
-        size: `${size.height}m × ${size.width}m`,
+        size: `${size.height}m Ã— ${size.width}m`,
         moving,
         speed,
         moveDir,

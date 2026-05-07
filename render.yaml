@@ -1,6 +1,6 @@
-services:
+﻿services:
   - type: web
-    name: visionguard
+    name: VisionBridge
     runtime: node
     buildCommand: npm install
     startCommand: node server.js

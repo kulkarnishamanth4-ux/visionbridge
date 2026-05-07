@@ -1,4 +1,4 @@
-require('dotenv').config();
+﻿require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { GoogleGenAI } = require('@google/genai');
@@ -7,7 +7,7 @@ const os = require('os');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-// Fallback model chain — tried in order until one succeeds
+// Fallback model chain â€” tried in order until one succeeds
 const MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-lite'];
 
 // --- Response cache: stores last successful result per endpoint so we never show "service busy" ---
@@ -100,10 +100,10 @@ function extractJSON(text) {
 
 // ========== SYSTEM INSTRUCTIONS PER MODE ==========
 
-// DETAILED MODE (default) — full spatial scene description + dangers
-const DETAILED_INSTRUCTION = `You are VisionGuard, an AI assistant helping a blind person understand their surroundings through a camera feed. Your role is critically important for their safety and independence.
+// DETAILED MODE (default) â€” full spatial scene description + dangers
+const DETAILED_INSTRUCTION = `You are VisionBridge, an AI assistant helping a blind person understand their surroundings through a camera feed. Your role is critically important for their safety and independence.
 
-RESPONSE FORMAT — You MUST respond with valid JSON only, no markdown, no extra text:
+RESPONSE FORMAT â€” You MUST respond with valid JSON only, no markdown, no extra text:
 {
   "description": "A detailed, spatial description of the scene using clock positions and distances",
   "dangers": [
@@ -126,22 +126,22 @@ DESCRIPTION GUIDELINES:
 - Note doorways, exits, furniture, and navigational landmarks
 - Be specific about colors, shapes, and textures when helpful
 
-DANGER DETECTION — HIGHEST PRIORITY:
-- Moving vehicles (cars, bikes, scooters) — always critical
-- Stairs, steps, curbs, or elevation changes — critical
-- Wet or slippery surfaces — warning
-- Obstacles in the walking path (poles, signs, chairs) — warning
-- Construction zones or uneven ground — warning
-- Crowds or fast-moving people — info
-- Low-hanging branches or overhead hazards — warning
-- Open edges, drops, or water — critical
+DANGER DETECTION â€” HIGHEST PRIORITY:
+- Moving vehicles (cars, bikes, scooters) â€” always critical
+- Stairs, steps, curbs, or elevation changes â€” critical
+- Wet or slippery surfaces â€” warning
+- Obstacles in the walking path (poles, signs, chairs) â€” warning
+- Construction zones or uneven ground â€” warning
+- Crowds or fast-moving people â€” info
+- Low-hanging branches or overhead hazards â€” warning
+- Open edges, drops, or water â€” critical
 
 Always prioritize dangers in your response. If there is immediate danger, the summary should be about that danger.`;
 
-// DANGER MODE — ONLY immediate, close-up threats. Ultra-concise.
-const DANGER_INSTRUCTION = `You are VisionGuard in DANGER MODE. You ONLY report immediate, close-range dangers to a blind person. Ignore everything else.
+// DANGER MODE â€” ONLY immediate, close-up threats. Ultra-concise.
+const DANGER_INSTRUCTION = `You are VisionBridge in DANGER MODE. You ONLY report immediate, close-range dangers to a blind person. Ignore everything else.
 
-RESPONSE FORMAT — valid JSON only, no markdown:
+RESPONSE FORMAT â€” valid JSON only, no markdown:
 {
   "description": "",
   "dangers": [
@@ -160,14 +160,14 @@ RULES:
 - ONLY report dangers within approximately 15 feet / 5 meters of the camera
 - If NO close danger exists, return empty dangers array and summary = "No immediate dangers detected. Path appears clear."
 - Focus on: vehicles approaching, steps/curbs/edges directly ahead, obstacles in walking path, open water/drops
-- Be extremely concise — this will be spoken urgently
+- Be extremely concise â€” this will be spoken urgently
 - Do NOT describe the general scene, furniture, or background objects
 - Every danger MUST include an estimated distance`;
 
-// SUMMARY MODE — entire scene in one sentence
-const SUMMARY_INSTRUCTION = `You are VisionGuard in SUMMARY MODE. Describe the ENTIRE scene in exactly ONE clear sentence for a blind person.
+// SUMMARY MODE â€” entire scene in one sentence
+const SUMMARY_INSTRUCTION = `You are VisionBridge in SUMMARY MODE. Describe the ENTIRE scene in exactly ONE clear sentence for a blind person.
 
-RESPONSE FORMAT — valid JSON only:
+RESPONSE FORMAT â€” valid JSON only:
 {
   "description": "",
   "dangers": [],
@@ -181,10 +181,10 @@ RULES:
 - Example: "You are on a busy sidewalk with shops on your left, a crosswalk ahead, and several people walking toward you."
 - If there is an obvious danger, mention it in the sentence`;
 
-// MEASURE MODE — object sizes and motion estimation
-const MEASURE_INSTRUCTION = `You are VisionGuard in MEASURE MODE. Estimate the approximate SIZE of all visible objects and whether they appear to be MOVING.
+// MEASURE MODE â€” object sizes and motion estimation
+const MEASURE_INSTRUCTION = `You are VisionBridge in MEASURE MODE. Estimate the approximate SIZE of all visible objects and whether they appear to be MOVING.
 
-RESPONSE FORMAT — valid JSON only:
+RESPONSE FORMAT â€” valid JSON only:
 {
   "objects": [
     {
@@ -212,10 +212,10 @@ SPEED ESTIMATION GUIDELINES:
 - "very fast" = 15+ mph / 24+ kmh (vehicles)
 - Base speed estimates on apparent motion blur, object type, and context`;
 
-// MEASURE MODE with two frames — for actual motion detection
-const MEASURE_DUAL_INSTRUCTION = `You are VisionGuard analyzing TWO consecutive camera frames taken approximately 1 second apart. Estimate object SIZES, DISTANCES, and MOVEMENT/SPEED by comparing object positions between the two frames.
+// MEASURE MODE with two frames â€” for actual motion detection
+const MEASURE_DUAL_INSTRUCTION = `You are VisionBridge analyzing TWO consecutive camera frames taken approximately 1 second apart. Estimate object SIZES, DISTANCES, and MOVEMENT/SPEED by comparing object positions between the two frames.
 
-RESPONSE FORMAT — valid JSON only:
+RESPONSE FORMAT â€” valid JSON only:
 {
   "objects": [
     {
@@ -232,15 +232,15 @@ RESPONSE FORMAT — valid JSON only:
 
 COMPARE THE TWO FRAMES:
 - Image 1 was taken first, Image 2 about 1 second later
-- Objects that shifted position are MOVING — estimate speed from displacement
+- Objects that shifted position are MOVING â€” estimate speed from displacement
 - Objects in the same position are STATIONARY
 - Use known object sizes (person ~1.7m, car ~4.3m long) to calibrate distance and speed
 - If an object is larger in frame 2, it is moving TOWARD the camera
 - If smaller in frame 2, it is moving AWAY`;
 
-const QA_SYSTEM_INSTRUCTION = `You are VisionGuard, an AI assistant helping a blind person understand their surroundings. The user is asking you a specific question about what they are seeing through their camera.
+const QA_SYSTEM_INSTRUCTION = `You are VisionBridge, an AI assistant helping a blind person understand their surroundings. The user is asking you a specific question about what they are seeing through their camera.
 
-Answer their question directly, clearly, and concisely. Use spatial references (left, right, ahead, behind) and distance estimates. Keep your response conversational and natural — it will be read aloud via text-to-speech.
+Answer their question directly, clearly, and concisely. Use spatial references (left, right, ahead, behind) and distance estimates. Keep your response conversational and natural â€” it will be read aloud via text-to-speech.
 
 If you cannot determine the answer from the image, say so honestly and describe what you can see instead. Be warm and helpful.
 
@@ -264,7 +264,7 @@ app.get('/api/status', (req, res) => {
     status: 'ok',
     apiKeyConfigured: !!client,
     message: client
-      ? 'VisionGuard is ready.'
+      ? 'VisionBridge is ready.'
       : 'API key not configured. Please add GEMINI_API_KEY to your .env file.'
   });
 });
@@ -339,7 +339,7 @@ app.post('/api/analyze', async (req, res) => {
       return res.json({
         ...responseCache.analyze,
         _cached: true,
-        summary: responseCache.analyze.summary + ' (using previous scan — AI service is busy)'
+        summary: responseCache.analyze.summary + ' (using previous scan â€” AI service is busy)'
       });
     }
 
@@ -352,7 +352,7 @@ app.post('/api/analyze', async (req, res) => {
   }
 });
 
-// Measure endpoint — accepts TWO frames for motion/speed detection
+// Measure endpoint â€” accepts TWO frames for motion/speed detection
 app.post('/api/measure', async (req, res) => {
   try {
     const client = getGenAI();
@@ -474,18 +474,18 @@ app.listen(PORT, '0.0.0.0', () => {
   const client = getGenAI();
   const ips = getLocalIPs();
 
-  console.log(`\n🛡️  VisionGuard is running!`);
+  console.log(`\nðŸ›¡ï¸  VisionBridge is running!`);
   console.log(`   Local:   http://localhost:${PORT}`);
   ips.forEach(ip => console.log(`   Network: http://${ip.address}:${PORT}  (${ip.name})`));
 
   if (client) {
-    console.log('\n✅ Gemini API key configured and ready.');
+    console.log('\nâœ… Gemini API key configured and ready.');
   } else {
-    console.log('\n⚠️  No API key found. Copy .env.example to .env and add your key.');
+    console.log('\nâš ï¸  No API key found. Copy .env.example to .env and add your key.');
     console.log('   Get a free key at: https://aistudio.google.com/');
   }
 
-  console.log('\n📱 To access from your phone or any device, run this in a NEW terminal:');
+  console.log('\nðŸ“± To access from your phone or any device, run this in a NEW terminal:');
   console.log('   npx ngrok http 3000');
   console.log('   Then open the https://xxxx.ngrok-free.app URL on any device.\n');
 });

@@ -1,5 +1,5 @@
-{
-  "name": "visionguard",
+﻿{
+  "name": "VisionBridge",
   "version": "1.0.0",
   "description": "AI-powered visual assistant for blind and visually impaired users",
   "main": "server.js",

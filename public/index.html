@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <meta name="description" content="VisionGuard — AI-powered visual assistant for blind and visually impaired users. Real-time scene description, danger detection, and voice interaction.">
-  <title>VisionGuard — AI Visual Assistant</title>
+  <meta name="description" content="VisionBridge â€” AI-powered visual assistant for blind and visually impaired users. Real-time scene description, danger detection, and voice interaction.">
+  <title>VisionBridge â€” AI Visual Assistant</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -15,7 +15,7 @@
   <a href="#main-controls" class="skip-link" id="skip-nav">Skip to main controls</a>
 
   <!-- App Container -->
-  <div id="app" class="app-container" role="application" aria-label="VisionGuard Visual Assistant">
+  <div id="app" class="app-container" role="application" aria-label="VisionBridge Visual Assistant">
 
     <!-- Header -->
     <header class="app-header" role="banner">
@@ -36,7 +36,7 @@
           </svg>
         </div>
         <div class="logo-text">
-          <h1>VisionGuard</h1>
+          <h1>VisionBridge</h1>
           <p class="tagline">AI Visual Assistant</p>
         </div>
       </div>
@@ -66,7 +66,7 @@
         </div>
       </section>
 
-      <!-- Status Ring — Central Visual Indicator -->
+      <!-- Status Ring â€” Central Visual Indicator -->
       <section class="status-section" aria-label="Current status">
         <div class="status-ring-container" id="status-ring-container">
           <div class="status-ring" id="status-ring">
@@ -124,7 +124,7 @@
           </div>
           <div class="output-body" id="output-body" role="log" aria-live="polite" aria-relevant="additions text">
             <p class="output-placeholder" id="output-placeholder">
-              VisionGuard will describe your surroundings here. Say <strong>"Hey Vision"</strong> to ask a question, or tap the scan button to analyze the scene.
+              VisionBridge will describe your surroundings here. Say <strong>"Hey Vision"</strong> to ask a question, or tap the scan button to analyze the scene.
             </p>
           </div>
         </div>
@@ -134,16 +134,16 @@
       <section class="mode-section" id="mode-section" aria-label="Analysis mode">
         <div class="mode-tabs" role="tablist" aria-label="Select analysis mode">
           <button id="mode-detailed" class="mode-tab active" role="tab" aria-selected="true" data-mode="detailed" aria-label="Detailed mode">
-            <span class="mode-icon">🔍</span><span class="mode-name">Detailed</span>
+            <span class="mode-icon">ðŸ”</span><span class="mode-name">Detailed</span>
           </button>
           <button id="mode-danger" class="mode-tab" role="tab" aria-selected="false" data-mode="danger" aria-label="Danger mode">
-            <span class="mode-icon">⚠️</span><span class="mode-name">Danger</span>
+            <span class="mode-icon">âš ï¸</span><span class="mode-name">Danger</span>
           </button>
           <button id="mode-summary" class="mode-tab" role="tab" aria-selected="false" data-mode="summary" aria-label="Summary mode">
-            <span class="mode-icon">📝</span><span class="mode-name">Summary</span>
+            <span class="mode-icon">ðŸ“</span><span class="mode-name">Summary</span>
           </button>
           <button id="mode-measure" class="mode-tab" role="tab" aria-selected="false" data-mode="measure" aria-label="Measure mode">
-            <span class="mode-icon">📏</span><span class="mode-name">Measure</span>
+            <span class="mode-icon">ðŸ“</span><span class="mode-name">Measure</span>
           </button>
         </div>
       </section>
@@ -256,27 +256,27 @@
             </defs>
           </svg>
         </div>
-        <h2 id="onboarding-title">Welcome to VisionGuard</h2>
+        <h2 id="onboarding-title">Welcome to VisionBridge</h2>
         <p class="onboarding-desc">Your AI-powered visual assistant. I'll describe your surroundings and alert you to dangers using your camera.</p>
         <ul class="onboarding-features">
           <li>
-            <span class="feature-icon">📷</span>
+            <span class="feature-icon">ðŸ“·</span>
             <span>Tap <strong>Scan</strong> to describe your surroundings</span>
           </li>
           <li>
-            <span class="feature-icon">🎤</span>
+            <span class="feature-icon">ðŸŽ¤</span>
             <span>Say <strong>"Hey Vision"</strong> to ask a question</span>
           </li>
           <li>
-            <span class="feature-icon">⚠️</span>
+            <span class="feature-icon">âš ï¸</span>
             <span>I'll <strong>alert you</strong> to immediate dangers</span>
           </li>
           <li>
-            <span class="feature-icon">🔄</span>
+            <span class="feature-icon">ðŸ”„</span>
             <span>Tap <strong>Auto</strong> for continuous monitoring</span>
           </li>
         </ul>
-        <button id="btn-start" class="start-btn" aria-label="Start VisionGuard">
+        <button id="btn-start" class="start-btn" aria-label="Start VisionBridge">
           <span>Get Started</span>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="5" y1="12" x2="19" y2="12"/>

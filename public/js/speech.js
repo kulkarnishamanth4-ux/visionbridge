@@ -1,5 +1,5 @@
-/**
- * speech.js — Voice I/O module for VisionGuard
+﻿/**
+ * speech.js â€” Voice I/O module for VisionBridge
  * Handles wake word detection, speech recognition, and text-to-speech with priority queue.
  */
 const SpeechModule = (() => {

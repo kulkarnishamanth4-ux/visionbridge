@@ -1,5 +1,5 @@
-/**
- * app.js — Main VisionGuard application controller
+﻿/**
+ * app.js â€” Main VisionBridge application controller
  * 
  * HYBRID ARCHITECTURE:
  * - PRIMARY: TensorFlow.js COCO-SSD runs locally in the browser (always works)
@@ -7,7 +7,7 @@
  * 
  * The app NEVER stops working, even if the API is down.
  */
-(async function VisionGuardApp() {
+(async function VisionBridgeApp() {
   'use strict';
 
   // --- State ---
@@ -61,7 +61,7 @@
     // Start camera
     const camResult = await CameraModule.startCamera();
     if (camResult.success) {
-      SpeechModule.speak('Welcome to VisionGuard. Loading object detection model...', SpeechModule.PRIORITY.INFO);
+      SpeechModule.speak('Welcome to VisionBridge. Loading object detection model...', SpeechModule.PRIORITY.INFO);
     } else {
       SpeechModule.speak('Could not access camera. Please grant permission and reload.', SpeechModule.PRIORITY.INFO);
       return;
@@ -218,7 +218,7 @@
   });
 
   // ==========================================
-  //    CORE SCAN — LOCAL FIRST, API OPTIONAL
+  //    CORE SCAN â€” LOCAL FIRST, API OPTIONAL
   // ==========================================
 
   async function performScan() {
@@ -274,7 +274,7 @@
       try {
         const frame = CameraModule.captureFrame();
         if (frame) {
-          // Fire API call but don't wait forever — use a 15s race
+          // Fire API call but don't wait forever â€” use a 15s race
           geminiResult = await Promise.race([
             ApiModule.analyzeScene(frame, currentMode),
             new Promise(resolve => setTimeout(() => resolve(null), 15000))
@@ -325,7 +325,7 @@
 
   function handleDetailedResult(local, gemini, hasGemini) {
     if (hasGemini) {
-      // Gemini gave a good response — use its richer description
+      // Gemini gave a good response â€” use its richer description
       if (gemini.dangers && gemini.dangers.length > 0) {
         UIModule.setMode('danger');
         UIModule.showDangers(gemini.dangers);

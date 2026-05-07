@@ -1,5 +1,5 @@
-/**
- * camera.js — Camera management module for VisionGuard
+﻿/**
+ * camera.js â€” Camera management module for VisionBridge
  * Handles camera initialization, frame capture, and lifecycle.
  * Prefers rear camera on mobile devices.
  */

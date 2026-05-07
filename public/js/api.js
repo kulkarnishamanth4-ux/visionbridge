@@ -1,6 +1,6 @@
-/**
- * api.js — Server communication module for VisionGuard
- * Multi-layer retry: server retries internally (4×4 models), 
+﻿/**
+ * api.js â€” Server communication module for VisionBridge
+ * Multi-layer retry: server retries internally (4Ã—4 models), 
  * then client retries the whole request 3 times with delays.
  * Server also caches last good response, so errors are rare.
  */
