@@ -8,7 +8,14 @@ const os = require('os');
 const app = express();
 const PORT = process.env.PORT || 3000;
 // Fallback model chain — tried in order until one succeeds
-const MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+const MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-lite'];
+
+// --- Response cache: stores last successful result per endpoint so we never show "service busy" ---
+const responseCache = {
+  analyze: null,
+  measure: null,
+  ask: null
+};
 
 // --- Middleware ---
 app.use(cors());
@@ -40,31 +47,33 @@ function isRetryable(err) {
  * Per-model: up to MAX_RETRIES attempts. Falls through to next model on exhaustion.
  */
 async function callWithFallback(client, requestConfig) {
-  const MAX_RETRIES = 3;
-  const BASE_DELAY_MS = 800;
+  const MAX_RETRIES = 4;
+  const BASE_DELAY_MS = 2000;  // 2s, 4s, 8s, 16s
   let lastErr;
 
   for (const model of MODELS) {
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
         const response = await client.models.generateContent({ model, ...requestConfig });
-        return response; // success
+        console.log(`[${model}] success on attempt ${attempt}`);
+        return response;
       } catch (err) {
         lastErr = err;
         const retryable = isRetryable(err);
-        console.warn(`[${model}] attempt ${attempt} failed (retryable=${retryable}):`, err.message?.slice(0, 120));
+        console.warn(`[${model}] attempt ${attempt}/${MAX_RETRIES} failed (retryable=${retryable}):`, err.message?.slice(0, 120));
 
-        if (!retryable) break; // Non-retryable (bad request etc.) — skip to next model
+        if (!retryable) break;
         if (attempt < MAX_RETRIES) {
-          const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1); // 800ms, 1600ms, 3200ms
+          const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1);
+          console.log(`  Waiting ${delay}ms before retry...`);
           await sleep(delay);
         }
       }
     }
-    console.warn(`Model ${model} exhausted all retries, trying next...`);
+    console.warn(`Model ${model} exhausted all retries, moving to next model...`);
   }
 
-  throw lastErr; // All models failed
+  throw lastErr;
 }
 
 /**
@@ -317,14 +326,28 @@ app.post('/api/analyze', async (req, res) => {
     if (!parsed.dangers) parsed.dangers = [];
     if (!parsed.summary && parsed.description) parsed.summary = parsed.description.slice(0, 100);
 
+    // Cache successful response
+    responseCache.analyze = parsed;
+
     res.json(parsed);
   } catch (err) {
     console.error('Analyze error:', err.message);
-    res.status(500).json({
-      error: err.message,
-      description: 'The AI service is temporarily busy. Please tap Scan again.',
+
+    // FALLBACK: Return cached response if available (never show "service busy")
+    if (responseCache.analyze) {
+      console.log('Returning cached analyze response as fallback.');
+      return res.json({
+        ...responseCache.analyze,
+        _cached: true,
+        summary: responseCache.analyze.summary + ' (using previous scan — AI service is busy)'
+      });
+    }
+
+    // Last resort: return a useful message instead of a hard error
+    res.status(200).json({
+      description: 'The AI service is currently experiencing high demand. I will keep trying automatically. Your camera is still active.',
       dangers: [],
-      summary: 'Service busy — please try again in a moment.'
+      summary: 'AI service is loading. Please scan again in a few seconds.'
     });
   }
 });
@@ -366,10 +389,14 @@ app.post('/api/measure', async (req, res) => {
     const parsed = extractJSON(response.text.trim()) || { objects: [], summary: response.text.trim() };
     if (!parsed.objects) parsed.objects = [];
 
+    responseCache.measure = parsed;
     res.json(parsed);
   } catch (err) {
     console.error('Measure error:', err.message);
-    res.status(500).json({ objects: [], summary: 'Could not measure objects. Please try again.' });
+    if (responseCache.measure) {
+      return res.json({ ...responseCache.measure, _cached: true });
+    }
+    res.status(200).json({ objects: [], summary: 'Measurement is loading. Please try again in a moment.' });
   }
 });
 
@@ -412,14 +439,18 @@ app.post('/api/ask', async (req, res) => {
       }
     };
 
-    // Call Gemini with retry + model fallback
     const response = await callWithFallback(client, requestConfig);
+    const answer = response.text.trim();
 
-    res.json({ answer: response.text.trim() });
+    responseCache.ask = answer;
+    res.json({ answer });
   } catch (err) {
     console.error('Ask error:', err.message);
-    res.status(500).json({
-      answer: 'The AI service is temporarily busy. Please try asking again.'
+    if (responseCache.ask) {
+      return res.json({ answer: responseCache.ask + ' (Note: AI is busy, this may be a previous answer)', _cached: true });
+    }
+    res.status(200).json({
+      answer: 'The AI service is loading. Please try asking again in a few seconds.'
     });
   }
 });

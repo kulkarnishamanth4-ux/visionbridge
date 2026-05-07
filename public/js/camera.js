@@ -9,9 +9,9 @@ const CameraModule = (() => {
   const canvas = document.getElementById('capture-canvas');
   const ctx = canvas.getContext('2d');
 
-  // Max dimension for captured frames — keeps API payloads small and fast
-  const MAX_DIM = 640;
-  const JPEG_QUALITY = 0.55;
+  // Smaller images = faster API calls = fewer timeouts
+  const MAX_DIM = 480;
+  const JPEG_QUALITY = 0.4;
 
   async function startCamera() {
     try {
