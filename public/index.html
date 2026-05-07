@@ -1,20 +1,18 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <meta name="description" content="VisionBridge â€” AI-powered visual assistant for blind and visually impaired users. Real-time scene description, danger detection, and voice interaction.">
-  <title>VisionBridge â€” AI Visual Assistant</title>
+  <meta name="description" content="VisionBridge — AI-powered visual assistant for blind and visually impaired users. Real-time scene description, danger detection, and voice interaction.">
+  <title>VisionBridge — AI Visual Assistant</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-  <!-- Skip Navigation for Accessibility -->
   <a href="#main-controls" class="skip-link" id="skip-nav">Skip to main controls</a>
 
-  <!-- App Container -->
   <div id="app" class="app-container" role="application" aria-label="VisionBridge Visual Assistant">
 
     <!-- Header -->
@@ -27,12 +25,7 @@
             <circle cx="20" cy="20" r="3" fill="#0a0e27"/>
             <path d="M5 20 C5 20, 20 8, 35 20" stroke="url(#logoGrad)" stroke-width="1.5" fill="none" opacity="0.5"/>
             <path d="M5 20 C5 20, 20 32, 35 20" stroke="url(#logoGrad)" stroke-width="1.5" fill="none" opacity="0.5"/>
-            <defs>
-              <linearGradient id="logoGrad" x1="0" y1="0" x2="40" y2="40">
-                <stop offset="0%" stop-color="#00d4ff"/>
-                <stop offset="100%" stop-color="#7b61ff"/>
-              </linearGradient>
-            </defs>
+            <defs><linearGradient id="logoGrad" x1="0" y1="0" x2="40" y2="40"><stop offset="0%" stop-color="#00d4ff"/><stop offset="100%" stop-color="#7b61ff"/></linearGradient></defs>
           </svg>
         </div>
         <div class="logo-text">
@@ -40,16 +33,20 @@
           <p class="tagline">AI Visual Assistant</p>
         </div>
       </div>
-      <div id="api-status" class="status-badge" role="status" aria-live="polite">
-        <span class="status-dot"></span>
-        <span class="status-text">Initializing...</span>
+      <div class="header-badges">
+        <span id="offline-indicator" class="badge badge-ok">🌐 Online</span>
+        <span id="battery-indicator" class="badge badge-ok">🔋100%</span>
+        <div id="api-status" class="status-badge" role="status" aria-live="polite">
+          <span class="status-dot"></span>
+          <span class="status-text">Initializing...</span>
+        </div>
       </div>
     </header>
 
     <!-- Main Content -->
     <main id="main-controls" role="main">
 
-      <!-- Camera Preview (hidden by default, toggleable) -->
+      <!-- Camera Preview -->
       <section class="camera-section" id="camera-section" aria-label="Camera preview">
         <div class="camera-viewport" id="camera-viewport">
           <video id="camera-feed" autoplay playsinline muted aria-label="Live camera feed"></video>
@@ -57,41 +54,35 @@
           <div class="camera-overlay" id="camera-overlay">
             <div class="scan-line" id="scan-line" aria-hidden="true"></div>
           </div>
-          <button id="toggle-camera-view" class="camera-toggle-btn" aria-label="Toggle camera preview visibility">
+          <button id="toggle-camera-view" class="camera-toggle-btn" aria-label="Toggle camera preview">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-              <circle cx="12" cy="12" r="3"/>
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
             </svg>
           </button>
         </div>
       </section>
 
-      <!-- Status Ring â€” Central Visual Indicator -->
+      <!-- Status Ring -->
       <section class="status-section" aria-label="Current status">
         <div class="status-ring-container" id="status-ring-container">
           <div class="status-ring" id="status-ring">
             <div class="status-ring-inner">
               <div class="status-icon" id="status-icon" aria-hidden="true">
-                <!-- Scanning icon -->
                 <svg id="icon-scanning" class="status-svg active" viewBox="0 0 48 48" fill="none">
                   <circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="2" stroke-dasharray="8 4" opacity="0.4"/>
-                  <circle cx="24" cy="24" r="10" stroke="currentColor" stroke-width="2"/>
-                  <circle cx="24" cy="24" r="3" fill="currentColor"/>
+                  <circle cx="24" cy="24" r="10" stroke="currentColor" stroke-width="2"/><circle cx="24" cy="24" r="3" fill="currentColor"/>
                 </svg>
-                <!-- Listening icon -->
                 <svg id="icon-listening" class="status-svg" viewBox="0 0 48 48" fill="none">
                   <rect x="18" y="8" width="12" height="20" rx="6" stroke="currentColor" stroke-width="2"/>
                   <path d="M12 24c0 6.627 5.373 12 12 12s12-5.373 12-12" stroke="currentColor" stroke-width="2"/>
                   <line x1="24" y1="36" x2="24" y2="42" stroke="currentColor" stroke-width="2"/>
                   <line x1="18" y1="42" x2="30" y2="42" stroke="currentColor" stroke-width="2"/>
                 </svg>
-                <!-- Speaking icon -->
                 <svg id="icon-speaking" class="status-svg" viewBox="0 0 48 48" fill="none">
                   <polygon points="12,16 12,32 20,32 30,40 30,8 20,16" fill="currentColor" opacity="0.6"/>
                   <path d="M34 18c2 2 3 4.5 3 6s-1 4-3 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                   <path d="M38 14c3 3.5 5 7.5 5 10s-2 6.5-5 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
                 </svg>
-                <!-- Danger icon -->
                 <svg id="icon-danger" class="status-svg" viewBox="0 0 48 48" fill="none">
                   <path d="M24 4L44 40H4L24 4Z" stroke="currentColor" stroke-width="2.5" fill="currentColor" fill-opacity="0.15"/>
                   <line x1="24" y1="16" x2="24" y2="28" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
@@ -107,9 +98,7 @@
       <!-- Danger Alerts -->
       <section id="danger-panel" class="danger-panel hidden" role="alert" aria-live="assertive" aria-label="Danger alerts">
         <div class="danger-header">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-            <path d="M12 2L1 21h22L12 2zm0 4l7.53 13H4.47L12 6zm-1 5v4h2v-4h-2zm0 6v2h2v-2h-2z"/>
-          </svg>
+          <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M12 2L1 21h22L12 2zm0 4l7.53 13H4.47L12 6zm-1 5v4h2v-4h-2zm0 6v2h2v-2h-2z"/></svg>
           <span>DANGER DETECTED</span>
         </div>
         <ul id="danger-list" class="danger-list"></ul>
@@ -120,30 +109,45 @@
         <div class="output-card" id="output-card">
           <div class="output-header">
             <h2>Scene Description</h2>
-            <div class="output-time" id="output-time" aria-label="Last updated"></div>
+            <div class="output-actions">
+              <button id="btn-bookmark" class="action-btn" aria-label="Bookmark this scan" title="Bookmark">⭐</button>
+              <button id="btn-share" class="action-btn" aria-label="Share this scan" title="Share">📤</button>
+              <button id="btn-history" class="action-btn" aria-label="View scan history" title="History">📋</button>
+              <span class="output-time" id="output-time"></span>
+            </div>
           </div>
-          <div class="output-body" id="output-body" role="log" aria-live="polite" aria-relevant="additions text">
+          <div class="output-body" id="output-body" role="log" aria-live="polite">
             <p class="output-placeholder" id="output-placeholder">
-              VisionBridge will describe your surroundings here. Say <strong>"Hey Vision"</strong> to ask a question, or tap the scan button to analyze the scene.
+              VisionBridge will describe your surroundings here. Say <strong>"Hey Vision"</strong> to ask a question, or tap scan.
             </p>
           </div>
         </div>
       </section>
 
+      <!-- Ambient Sound Indicator -->
+      <div id="ambient-sound" class="ambient-bar hidden">
+        <span id="ambient-icon">🔇</span>
+        <span id="ambient-label">Quiet</span>
+        <div class="ambient-level"><div id="ambient-level-fill" class="ambient-level-fill"></div></div>
+      </div>
+
       <!-- Mode Selector -->
       <section class="mode-section" id="mode-section" aria-label="Analysis mode">
         <div class="mode-tabs" role="tablist" aria-label="Select analysis mode">
-          <button id="mode-detailed" class="mode-tab active" role="tab" aria-selected="true" data-mode="detailed" aria-label="Detailed mode">
-            <span class="mode-icon">ðŸ”</span><span class="mode-name">Detailed</span>
+          <button id="mode-detailed" class="mode-tab active" role="tab" aria-selected="true" data-mode="detailed">
+            <span class="mode-icon">🔍</span><span class="mode-name">Detailed</span>
           </button>
-          <button id="mode-danger" class="mode-tab" role="tab" aria-selected="false" data-mode="danger" aria-label="Danger mode">
-            <span class="mode-icon">âš ï¸</span><span class="mode-name">Danger</span>
+          <button id="mode-danger" class="mode-tab" role="tab" aria-selected="false" data-mode="danger">
+            <span class="mode-icon">⚠️</span><span class="mode-name">Danger</span>
           </button>
-          <button id="mode-summary" class="mode-tab" role="tab" aria-selected="false" data-mode="summary" aria-label="Summary mode">
-            <span class="mode-icon">ðŸ“</span><span class="mode-name">Summary</span>
+          <button id="mode-summary" class="mode-tab" role="tab" aria-selected="false" data-mode="summary">
+            <span class="mode-icon">📝</span><span class="mode-name">Summary</span>
           </button>
-          <button id="mode-measure" class="mode-tab" role="tab" aria-selected="false" data-mode="measure" aria-label="Measure mode">
-            <span class="mode-icon">ðŸ“</span><span class="mode-name">Measure</span>
+          <button id="mode-measure" class="mode-tab" role="tab" aria-selected="false" data-mode="measure">
+            <span class="mode-icon">📏</span><span class="mode-name">Measure</span>
+          </button>
+          <button id="mode-read" class="mode-tab" role="tab" aria-selected="false" data-mode="read">
+            <span class="mode-icon">📖</span><span class="mode-name">Read</span>
           </button>
         </div>
       </section>
@@ -151,49 +155,39 @@
       <!-- Controls -->
       <section class="controls-section" id="controls" aria-label="Main controls">
         <button id="btn-scan" class="control-btn primary-btn" aria-label="Scan surroundings now">
-          <div class="btn-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"/>
-              <circle cx="12" cy="12" r="4"/>
-              <line x1="12" y1="2" x2="12" y2="6"/>
-              <line x1="12" y1="18" x2="12" y2="22"/>
-              <line x1="2" y1="12" x2="6" y2="12"/>
-              <line x1="18" y1="12" x2="22" y2="12"/>
-            </svg>
-          </div>
-          <span>Scan</span>
+          <div class="btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/>
+            <line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/>
+            <line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
+          </svg></div><span>Scan</span>
         </button>
-
         <button id="btn-listen" class="control-btn listen-btn" aria-label="Ask a question by voice">
-          <div class="btn-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="9" y="2" width="6" height="12" rx="3"/>
-              <path d="M5 12c0 3.866 3.134 7 7 7s7-3.134 7-7"/>
-              <line x1="12" y1="19" x2="12" y2="22"/>
-            </svg>
-          </div>
-          <span>Ask</span>
+          <div class="btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 12c0 3.866 3.134 7 7 7s7-3.134 7-7"/>
+            <line x1="12" y1="19" x2="12" y2="22"/>
+          </svg></div><span>Ask</span>
         </button>
-
-        <button id="btn-auto" class="control-btn auto-btn" aria-label="Toggle continuous scanning mode">
-          <div class="btn-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M23 4v6h-6"/>
-              <path d="M1 20v-6h6"/>
-              <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
-            </svg>
-          </div>
-          <span>Auto</span>
+        <button id="btn-auto" class="control-btn auto-btn" aria-label="Toggle continuous scanning">
+          <div class="btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+          </svg></div><span>Auto</span>
         </button>
-
+        <button id="btn-sos" class="control-btn sos-btn" aria-label="Emergency SOS">
+          <div class="btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
+            <line x1="12" y1="8" x2="12" y2="13"/><circle cx="12" cy="16" r="1" fill="currentColor"/>
+          </svg></div><span>SOS</span>
+        </button>
+        <button id="btn-score" class="control-btn score-btn" aria-label="Performance score">
+          <div class="btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/>
+          </svg></div><span>Score</span>
+        </button>
         <button id="btn-settings" class="control-btn settings-btn" aria-label="Open settings">
-          <div class="btn-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="3"/>
-              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
-            </svg>
-          </div>
-          <span>Settings</span>
+          <div class="btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+          </svg></div><span>Settings</span>
         </button>
       </section>
 
@@ -204,37 +198,71 @@
       <div class="modal-backdrop" id="settings-backdrop"></div>
       <div class="modal-content">
         <h2 id="settings-title">Settings</h2>
-
         <div class="setting-group">
           <label for="scan-interval">Auto-scan interval (seconds)</label>
-          <input type="range" id="scan-interval" min="3" max="15" value="6" step="1" aria-valuemin="3" aria-valuemax="15">
+          <input type="range" id="scan-interval" min="3" max="15" value="6" step="1">
           <span class="range-value" id="scan-interval-value">6s</span>
         </div>
-
         <div class="setting-group">
           <label for="voice-select">Voice</label>
-          <select id="voice-select" aria-label="Select text-to-speech voice"></select>
+          <select id="voice-select" aria-label="Select TTS voice"></select>
         </div>
-
         <div class="setting-group">
           <label for="speech-rate">Speech speed</label>
-          <input type="range" id="speech-rate" min="0.5" max="2" value="1" step="0.1" aria-valuemin="0.5" aria-valuemax="2">
+          <input type="range" id="speech-rate" min="0.5" max="2" value="1" step="0.1">
           <span class="range-value" id="speech-rate-value">1.0x</span>
         </div>
-
+        <div class="setting-group">
+          <label for="tts-language">TTS Language</label>
+          <select id="tts-language" aria-label="Select language"></select>
+        </div>
         <div class="setting-group">
           <label for="wake-word-input">Wake word</label>
-          <input type="text" id="wake-word-input" value="hey vision" aria-label="Wake word phrase">
+          <input type="text" id="wake-word-input" value="hey vision">
         </div>
-
+        <div class="setting-group">
+          <label for="sos-contact">Emergency contact (phone/email)</label>
+          <input type="text" id="sos-contact" placeholder="Enter phone or email" value="">
+        </div>
         <div class="setting-group toggle-group">
           <label for="camera-preview-toggle">Show camera preview</label>
           <button id="camera-preview-toggle" class="toggle-switch" role="switch" aria-checked="false">
             <span class="toggle-slider"></span>
           </button>
         </div>
-
         <button id="close-settings" class="modal-close-btn" aria-label="Close settings">Done</button>
+      </div>
+    </div>
+
+    <!-- History Modal -->
+    <div id="history-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="history-title">
+      <div class="modal-backdrop" id="history-backdrop"></div>
+      <div class="modal-content">
+        <h2 id="history-title">📋 Scan History</h2>
+        <div id="history-list" class="history-list"></div>
+        <button id="clear-history" class="modal-close-btn" style="background:#ff3366;margin-bottom:8px">Clear All</button>
+        <button id="close-history" class="modal-close-btn">Done</button>
+      </div>
+    </div>
+
+    <!-- Performance Score Modal -->
+    <div id="score-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="score-title">
+      <div class="modal-backdrop" id="score-backdrop"></div>
+      <div class="modal-content">
+        <h2 id="score-title">📊 Performance Score</h2>
+        <div id="score-content" class="score-content"></div>
+        <button id="close-score" class="modal-close-btn">Done</button>
+      </div>
+    </div>
+
+    <!-- SOS Alert Panel (shown when SOS triggered) -->
+    <div id="sos-panel" class="sos-panel hidden">
+      <div class="sos-inner">
+        <span class="sos-icon">🆘</span>
+        <h2>EMERGENCY SOS ACTIVATED</h2>
+        <p id="sos-reason"></p>
+        <p id="sos-location"></p>
+        <button id="sos-cancel" class="sos-cancel-btn">Cancel SOS</button>
       </div>
     </div>
 
@@ -248,39 +276,22 @@
             <circle cx="40" cy="40" r="6" fill="#0a0e27"/>
             <path d="M8 40 C8 40, 40 16, 72 40" stroke="url(#onbGrad)" stroke-width="2" fill="none" opacity="0.5"/>
             <path d="M8 40 C8 40, 40 64, 72 40" stroke="url(#onbGrad)" stroke-width="2" fill="none" opacity="0.5"/>
-            <defs>
-              <linearGradient id="onbGrad" x1="0" y1="0" x2="80" y2="80">
-                <stop offset="0%" stop-color="#00d4ff"/>
-                <stop offset="100%" stop-color="#7b61ff"/>
-              </linearGradient>
-            </defs>
+            <defs><linearGradient id="onbGrad" x1="0" y1="0" x2="80" y2="80"><stop offset="0%" stop-color="#00d4ff"/><stop offset="100%" stop-color="#7b61ff"/></linearGradient></defs>
           </svg>
         </div>
         <h2 id="onboarding-title">Welcome to VisionBridge</h2>
-        <p class="onboarding-desc">Your AI-powered visual assistant. I'll describe your surroundings and alert you to dangers using your camera.</p>
+        <p class="onboarding-desc">Your AI-powered visual assistant with 17 smart features. I'll describe your surroundings, alert you to dangers, read text, track motion, and much more.</p>
         <ul class="onboarding-features">
-          <li>
-            <span class="feature-icon">ðŸ“·</span>
-            <span>Tap <strong>Scan</strong> to describe your surroundings</span>
-          </li>
-          <li>
-            <span class="feature-icon">ðŸŽ¤</span>
-            <span>Say <strong>"Hey Vision"</strong> to ask a question</span>
-          </li>
-          <li>
-            <span class="feature-icon">âš ï¸</span>
-            <span>I'll <strong>alert you</strong> to immediate dangers</span>
-          </li>
-          <li>
-            <span class="feature-icon">ðŸ”„</span>
-            <span>Tap <strong>Auto</strong> for continuous monitoring</span>
-          </li>
+          <li><span class="feature-icon">📷</span><span>Tap <strong>Scan</strong> to describe your surroundings</span></li>
+          <li><span class="feature-icon">📖</span><span><strong>Read</strong> mode reads signs & text aloud</span></li>
+          <li><span class="feature-icon">⚠️</span><span><strong>3D spatial audio</strong> alerts from the danger's direction</span></li>
+          <li><span class="feature-icon">📳</span><span><strong>Haptic vibration</strong> for instant danger feedback</span></li>
+          <li><span class="feature-icon">🆘</span><span><strong>Emergency SOS</strong> — shake hard or say "Help"</span></li>
         </ul>
         <button id="btn-start" class="start-btn" aria-label="Start VisionBridge">
           <span>Get Started</span>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="5" y1="12" x2="19" y2="12"/>
-            <polyline points="12 5 19 12 12 19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
           </svg>
         </button>
       </div>
@@ -288,14 +299,17 @@
 
   </div>
 
-  <!-- TensorFlow.js + COCO-SSD for local in-browser object detection (no API needed) -->
+  <!-- TensorFlow.js + COCO-SSD -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+  <!-- Tesseract.js for OCR -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <!-- App Scripts -->
   <script src="js/camera.js"></script>
   <script src="js/speech.js"></script>
   <script src="js/detector.js"></script>
+  <script src="js/features.js"></script>
   <script src="js/api.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/app.js"></script>

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * speech.js â€” Voice I/O module for VisionBridge
  * Handles wake word detection, speech recognition, and text-to-speech with priority queue.
  */
@@ -250,10 +250,21 @@ const SpeechModule = (() => {
     currentUtterance = null;
   }
 
-  // --- Configuration ---
   function setWakeWord(word) { wakeWord = word.toLowerCase().trim(); }
   function setVoice(voice) { selectedVoice = voice; }
   function setRate(rate) { speechRate = rate; }
+
+  function setLanguage(langCode) {
+    const allVoices = synth.getVoices();
+    const match = allVoices.find(v => v.lang.startsWith(langCode)) || null;
+    if (match) {
+      selectedVoice = match;
+      console.log('[Speech] Language set to:', match.lang, match.name);
+    } else {
+      console.warn('[Speech] No voice found for language:', langCode);
+    }
+  }
+
   function onWakeWord(cb) { onWakeWordCallback = cb; }
   function onTranscript(cb) { onTranscriptCallback = cb; }
   function onSpeakStart(cb) { onSpeakStartCallback = cb; }
@@ -265,7 +276,7 @@ const SpeechModule = (() => {
     initSynthesis, loadVoices,
     speak, stopSpeaking,
     unlockAudio, playDangerBeep,
-    setWakeWord, setVoice, setRate,
+    setWakeWord, setVoice, setRate, setLanguage,
     onWakeWord, onTranscript, onSpeakStart, onSpeakEnd,
     get isListening() { return isListening; },
     get isSpeaking() { return isSpeaking; },
