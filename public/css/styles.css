@@ -275,6 +275,104 @@ body {
 .output-entry.question .entry-label { color: var(--purple); }
 .output-entry .entry-text { color: var(--text-primary); }
 
+/* ===== Mode Selector Tabs ===== */
+.mode-section {
+  margin-bottom: 12px;
+}
+.mode-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  background: var(--bg-card);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  backdrop-filter: blur(8px);
+}
+.mode-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 10px 4px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font);
+  font-size: 0.58rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: var(--transition);
+  -webkit-tap-highlight-color: transparent;
+}
+.mode-icon { font-size: 1.1rem; }
+.mode-tab:hover {
+  color: var(--text-primary);
+  background: rgba(255,255,255,0.04);
+}
+.mode-tab.active {
+  color: var(--accent);
+  background: rgba(0,212,255,0.08);
+  border-color: rgba(0,212,255,0.25);
+}
+/* Mode-specific active colors */
+.mode-tab[data-mode="danger"].active {
+  color: var(--danger);
+  background: rgba(255,51,102,0.08);
+  border-color: rgba(255,51,102,0.25);
+}
+.mode-tab[data-mode="summary"].active {
+  color: var(--purple);
+  background: rgba(123,97,255,0.08);
+  border-color: rgba(123,97,255,0.25);
+}
+.mode-tab[data-mode="measure"].active {
+  color: var(--success);
+  background: rgba(0,255,136,0.08);
+  border-color: rgba(0,255,136,0.25);
+}
+
+/* Measure results styling within output area */
+.measure-objects {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.measure-object {
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.measure-object:last-child { border-bottom: none; }
+.measure-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+.measure-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+.measure-detail-label {
+  font-weight: 600;
+  color: var(--text-primary);
+  opacity: 0.7;
+}
+.measure-moving {
+  color: var(--warning);
+  font-weight: 600;
+}
+.measure-stationary {
+  color: var(--success);
+  font-weight: 600;
+}
+
 /* ===== Controls ===== */
 .controls-section {
   display: grid;

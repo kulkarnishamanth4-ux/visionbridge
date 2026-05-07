@@ -88,14 +88,22 @@ const UIModule = (() => {
     els.dangerPanel.classList.remove('hidden');
   }
 
-  function addDescription(text) {
+  function addDescription(text, isHTML = false) {
     if (els.outputPlaceholder) els.outputPlaceholder.remove();
 
     const entry = document.createElement('div');
     entry.className = 'output-entry';
+
+    // Choose icon based on current mode tab
+    const activeTab = document.querySelector('.mode-tab.active');
+    const modeIcons = { detailed: '🔍', danger: '⚠️', summary: '📝', measure: '📏' };
+    const icon = modeIcons[activeTab?.dataset.mode] || '🔍';
+    const modeLabels = { detailed: 'Scene Analysis', danger: 'Danger Scan', summary: 'Summary', measure: 'Measurements' };
+    const label = modeLabels[activeTab?.dataset.mode] || 'Scene Analysis';
+
     entry.innerHTML = `
-      <div class="entry-label">🔍 Scene Analysis</div>
-      <div class="entry-text">${escapeHtml(text)}</div>
+      <div class="entry-label">${icon} ${label}</div>
+      <div class="entry-text">${isHTML ? text : escapeHtml(text)}</div>
     `;
     els.outputBody.appendChild(entry);
     els.outputBody.scrollTop = els.outputBody.scrollHeight;

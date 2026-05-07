@@ -9,14 +9,18 @@ const CameraModule = (() => {
   const canvas = document.getElementById('capture-canvas');
   const ctx = canvas.getContext('2d');
 
+  // Max dimension for captured frames — keeps API payloads small and fast
+  const MAX_DIM = 640;
+  const JPEG_QUALITY = 0.55;
+
   async function startCamera() {
     try {
-      // Prefer rear camera for mobile
+      // Prefer rear camera for mobile, request moderate resolution
       const constraints = {
         video: {
           facingMode: { ideal: 'environment' },
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          width: { ideal: 640, max: 1280 },
+          height: { ideal: 480, max: 720 }
         },
         audio: false
       };
@@ -25,28 +29,38 @@ const CameraModule = (() => {
       video.srcObject = stream;
       await video.play();
 
-      // Set canvas to match video dimensions
-      video.addEventListener('loadedmetadata', () => {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-      });
-
       return { success: true };
     } catch (err) {
-      console.error('Camera error:', err);
-      return { success: false, error: err.message };
+      // Fallback: try without constraints (some browsers reject specific facingMode)
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        video.srcObject = stream;
+        await video.play();
+        return { success: true };
+      } catch (err2) {
+        console.error('Camera error:', err2);
+        return { success: false, error: err2.message };
+      }
     }
   }
 
   function captureFrame() {
     if (!stream || !video.videoWidth) return null;
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    ctx.drawImage(video, 0, 0);
+    // Scale down to MAX_DIM on the longest side to keep payloads small
+    let w = video.videoWidth;
+    let h = video.videoHeight;
+    if (w > MAX_DIM || h > MAX_DIM) {
+      const scale = MAX_DIM / Math.max(w, h);
+      w = Math.round(w * scale);
+      h = Math.round(h * scale);
+    }
 
-    // Compress as JPEG for smaller payload
-    return canvas.toDataURL('image/jpeg', 0.7);
+    canvas.width = w;
+    canvas.height = h;
+    ctx.drawImage(video, 0, 0, w, h);
+
+    return canvas.toDataURL('image/jpeg', JPEG_QUALITY);
   }
 
   function stopCamera() {
