@@ -1,5 +1,5 @@
-﻿/**
- * ui.js â€” UI update and accessibility module for VisionBridge
+/**
+ * ui.js - UI update and accessibility module for VisionBridge
  */
 const UIModule = (() => {
   // Element references
@@ -56,7 +56,7 @@ const UIModule = (() => {
     // Labels
     const labels = {
       scanning: 'Scanning', listening: 'Listening',
-      speaking: 'Speaking', danger: 'âš  Danger', idle: 'Ready'
+      speaking: 'Speaking', danger: '\u26A0 Danger', idle: 'Ready'
     };
     els.statusLabel.textContent = labels[mode] || 'Ready';
   }
@@ -81,7 +81,7 @@ const UIModule = (() => {
     els.dangerList.innerHTML = dangers.map(d => `
       <li>
         <span class="danger-severity ${d.severity || 'warning'}">${d.severity || 'warning'}</span>
-        <span>${d.description || d.type} ${d.direction ? 'â€” ' + d.direction : ''}</span>
+        <span>${d.description || d.type} ${d.direction ? '- ' + d.direction : ''}</span>
       </li>
     `).join('');
 
@@ -96,9 +96,9 @@ const UIModule = (() => {
 
     // Choose icon based on current mode tab
     const activeTab = document.querySelector('.mode-tab.active');
-    const modeIcons = { detailed: 'ðŸ”', danger: 'âš ï¸', summary: 'ðŸ“', measure: 'ðŸ“' };
-    const icon = modeIcons[activeTab?.dataset.mode] || 'ðŸ”';
-    const modeLabels = { detailed: 'Scene Analysis', danger: 'Danger Scan', summary: 'Summary', measure: 'Measurements' };
+    const modeIcons = { detailed: '\uD83D\uDD0D', danger: '\u26A0\uFE0F', summary: '\uD83D\uDCDD', measure: '\uD83D\uDCCF', read: '\uD83D\uDCD6' };
+    const icon = modeIcons[activeTab?.dataset.mode] || '\uD83D\uDD0D';
+    const modeLabels = { detailed: 'Scene Analysis', danger: 'Danger Scan', summary: 'Summary', measure: 'Measurements', read: 'Text Reading' };
     const label = modeLabels[activeTab?.dataset.mode] || 'Scene Analysis';
 
     entry.innerHTML = `
@@ -116,7 +116,7 @@ const UIModule = (() => {
     const entry = document.createElement('div');
     entry.className = 'output-entry question';
     entry.innerHTML = `
-      <div class="entry-label">ðŸŽ¤ You asked</div>
+      <div class="entry-label">\uD83C\uDFA4 You asked</div>
       <div class="entry-text">${escapeHtml(question)}</div>
     `;
     els.outputBody.appendChild(entry);
@@ -124,7 +124,7 @@ const UIModule = (() => {
     const ansEntry = document.createElement('div');
     ansEntry.className = 'output-entry';
     ansEntry.innerHTML = `
-      <div class="entry-label">ðŸ’¬ Answer</div>
+      <div class="entry-label">\uD83D\uDCAC Answer</div>
       <div class="entry-text">${escapeHtml(answer)}</div>
     `;
     els.outputBody.appendChild(ansEntry);

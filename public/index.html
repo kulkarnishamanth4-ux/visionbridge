@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <meta name="description" content="VisionBridge — AI-powered visual assistant for blind and visually impaired users. Real-time scene description, danger detection, and voice interaction.">
-  <title>VisionBridge — AI Visual Assistant</title>
+  <meta name="description" content="VisionBridge - AI-powered visual assistant for blind and visually impaired users. Real-time scene description, danger detection, and voice interaction.">
+  <title>VisionBridge - AI Visual Assistant</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -34,8 +34,8 @@
         </div>
       </div>
       <div class="header-badges">
-        <span id="offline-indicator" class="badge badge-ok">🌐 Online</span>
-        <span id="battery-indicator" class="badge badge-ok">🔋100%</span>
+        <span id="offline-indicator" class="badge badge-ok">&#x1F310; Online</span>
+        <span id="battery-indicator" class="badge badge-ok">&#x1F50B; 100%</span>
         <div id="api-status" class="status-badge" role="status" aria-live="polite">
           <span class="status-dot"></span>
           <span class="status-text">Initializing...</span>
@@ -110,9 +110,9 @@
           <div class="output-header">
             <h2>Scene Description</h2>
             <div class="output-actions">
-              <button id="btn-bookmark" class="action-btn" aria-label="Bookmark this scan" title="Bookmark">⭐</button>
-              <button id="btn-share" class="action-btn" aria-label="Share this scan" title="Share">📤</button>
-              <button id="btn-history" class="action-btn" aria-label="View scan history" title="History">📋</button>
+              <button id="btn-bookmark" class="action-btn" aria-label="Bookmark this scan" title="Bookmark">&#x2B50;</button>
+              <button id="btn-share" class="action-btn" aria-label="Share this scan" title="Share">&#x1F4E4;</button>
+              <button id="btn-history" class="action-btn" aria-label="View scan history" title="History">&#x1F4CB;</button>
               <span class="output-time" id="output-time"></span>
             </div>
           </div>
@@ -126,7 +126,7 @@
 
       <!-- Ambient Sound Indicator -->
       <div id="ambient-sound" class="ambient-bar hidden">
-        <span id="ambient-icon">🔇</span>
+        <span id="ambient-icon">&#x1F507;</span>
         <span id="ambient-label">Quiet</span>
         <div class="ambient-level"><div id="ambient-level-fill" class="ambient-level-fill"></div></div>
       </div>
@@ -135,19 +135,19 @@
       <section class="mode-section" id="mode-section" aria-label="Analysis mode">
         <div class="mode-tabs" role="tablist" aria-label="Select analysis mode">
           <button id="mode-detailed" class="mode-tab active" role="tab" aria-selected="true" data-mode="detailed">
-            <span class="mode-icon">🔍</span><span class="mode-name">Detailed</span>
+            <span class="mode-icon">&#x1F50D;</span><span class="mode-name">Detailed</span>
           </button>
           <button id="mode-danger" class="mode-tab" role="tab" aria-selected="false" data-mode="danger">
-            <span class="mode-icon">⚠️</span><span class="mode-name">Danger</span>
+            <span class="mode-icon">&#x26A0;&#xFE0F;</span><span class="mode-name">Danger</span>
           </button>
           <button id="mode-summary" class="mode-tab" role="tab" aria-selected="false" data-mode="summary">
-            <span class="mode-icon">📝</span><span class="mode-name">Summary</span>
+            <span class="mode-icon">&#x1F4DD;</span><span class="mode-name">Summary</span>
           </button>
           <button id="mode-measure" class="mode-tab" role="tab" aria-selected="false" data-mode="measure">
-            <span class="mode-icon">📏</span><span class="mode-name">Measure</span>
+            <span class="mode-icon">&#x1F4CF;</span><span class="mode-name">Measure</span>
           </button>
           <button id="mode-read" class="mode-tab" role="tab" aria-selected="false" data-mode="read">
-            <span class="mode-icon">📖</span><span class="mode-name">Read</span>
+            <span class="mode-icon">&#x1F4D6;</span><span class="mode-name">Read</span>
           </button>
         </div>
       </section>
@@ -238,7 +238,7 @@
     <div id="history-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="history-title">
       <div class="modal-backdrop" id="history-backdrop"></div>
       <div class="modal-content">
-        <h2 id="history-title">📋 Scan History</h2>
+        <h2 id="history-title">&#x1F4CB; Scan History</h2>
         <div id="history-list" class="history-list"></div>
         <button id="clear-history" class="modal-close-btn" style="background:#ff3366;margin-bottom:8px">Clear All</button>
         <button id="close-history" class="modal-close-btn">Done</button>
@@ -249,16 +249,16 @@
     <div id="score-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="score-title">
       <div class="modal-backdrop" id="score-backdrop"></div>
       <div class="modal-content">
-        <h2 id="score-title">📊 Performance Score</h2>
+        <h2 id="score-title">&#x1F4CA; Performance Score</h2>
         <div id="score-content" class="score-content"></div>
         <button id="close-score" class="modal-close-btn">Done</button>
       </div>
     </div>
 
-    <!-- SOS Alert Panel (shown when SOS triggered) -->
+    <!-- SOS Alert Panel -->
     <div id="sos-panel" class="sos-panel hidden">
       <div class="sos-inner">
-        <span class="sos-icon">🆘</span>
+        <span class="sos-icon">&#x1F198;</span>
         <h2>EMERGENCY SOS ACTIVATED</h2>
         <p id="sos-reason"></p>
         <p id="sos-location"></p>
@@ -282,11 +282,11 @@
         <h2 id="onboarding-title">Welcome to VisionBridge</h2>
         <p class="onboarding-desc">Your AI-powered visual assistant with 17 smart features. I'll describe your surroundings, alert you to dangers, read text, track motion, and much more.</p>
         <ul class="onboarding-features">
-          <li><span class="feature-icon">📷</span><span>Tap <strong>Scan</strong> to describe your surroundings</span></li>
-          <li><span class="feature-icon">📖</span><span><strong>Read</strong> mode reads signs & text aloud</span></li>
-          <li><span class="feature-icon">⚠️</span><span><strong>3D spatial audio</strong> alerts from the danger's direction</span></li>
-          <li><span class="feature-icon">📳</span><span><strong>Haptic vibration</strong> for instant danger feedback</span></li>
-          <li><span class="feature-icon">🆘</span><span><strong>Emergency SOS</strong> — shake hard or say "Help"</span></li>
+          <li><span class="feature-icon">&#x1F4F7;</span><span>Tap <strong>Scan</strong> to describe your surroundings</span></li>
+          <li><span class="feature-icon">&#x1F4D6;</span><span><strong>Read</strong> mode reads signs and text aloud</span></li>
+          <li><span class="feature-icon">&#x26A0;&#xFE0F;</span><span><strong>3D spatial audio</strong> alerts from the danger's direction</span></li>
+          <li><span class="feature-icon">&#x1F4F3;</span><span><strong>Haptic vibration</strong> for instant danger feedback</span></li>
+          <li><span class="feature-icon">&#x1F198;</span><span><strong>Emergency SOS</strong> - shake hard or say "Help"</span></li>
         </ul>
         <button id="btn-start" class="start-btn" aria-label="Start VisionBridge">
           <span>Get Started</span>
