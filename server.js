@@ -78,7 +78,7 @@ async function callWithFallback(client, requestConfig) {
 
 /**
  * Robustly extract a JSON object from the model's text response.
- * Handles markdown fences, leading/trailing text, and partial wrapping.
+ * Handles markdown fences, truncated JSON, and partial wrapping.
  */
 function extractJSON(text) {
   // Strip markdown code fences
@@ -94,8 +94,32 @@ function extractJSON(text) {
     try { return JSON.parse(cleaned.slice(start, end + 1)); } catch {}
   }
 
+  // Handle TRUNCATED JSON: try to extract known fields via regex
+  const descMatch = cleaned.match(/"description"\s*:\s*"((?:[^"\\]|\\.)*)/i);
+  const summaryMatch = cleaned.match(/"summary"\s*:\s*"((?:[^"\\]|\\.)*)/i);
+  if (descMatch || summaryMatch) {
+    return {
+      description: descMatch ? descMatch[1] : (summaryMatch ? summaryMatch[1] : ''),
+      dangers: [],
+      summary: summaryMatch ? summaryMatch[1] : (descMatch ? descMatch[1].slice(0, 120) : '')
+    };
+  }
+
   // Return null to signal parse failure
   return null;
+}
+
+/**
+ * Strip JSON/markdown artifacts from raw text for display fallback.
+ */
+function cleanRawText(text) {
+  return text
+    .replace(/```json\s*/gi, '').replace(/```\s*/g, '')
+    .replace(/^\s*\{[^}]*"description"\s*:\s*"/i, '')
+    .replace(/"\s*,\s*"dangers".*$/s, '')
+    .replace(/"\s*,\s*"summary".*$/s, '')
+    .replace(/^[\s"{}:,]+/, '').replace(/[\s"{}:,]+$/, '')
+    .trim();
 }
 
 // ========== SYSTEM INSTRUCTIONS PER MODE ==========
@@ -310,7 +334,7 @@ app.post('/api/analyze', async (req, res) => {
       config: {
         systemInstruction,
         temperature: 0.3,
-        maxOutputTokens: mode === 'summary' ? 256 : 1024
+        maxOutputTokens: mode === 'summary' ? 256 : 2048
       }
     };
 
@@ -318,9 +342,9 @@ app.post('/api/analyze', async (req, res) => {
     const text = response.text.trim();
 
     const parsed = extractJSON(text) || {
-      description: text,
+      description: cleanRawText(text),
       dangers: [],
-      summary: text.length > 120 ? text.slice(0, 117) + '...' : text
+      summary: cleanRawText(text).slice(0, 120)
     };
 
     if (!parsed.dangers) parsed.dangers = [];

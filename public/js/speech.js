@@ -289,14 +289,39 @@ const SpeechModule = (() => {
 
   function setLanguage(langCode) {
     currentLang = langCode;
-    translateCache.clear(); // Clear cache when language changes
+    translateCache.clear();
     const allVoices = synth.getVoices();
-    const match = allVoices.find(v => v.lang.startsWith(langCode)) || null;
-    if (match) {
-      selectedVoice = match;
-      console.log('[Speech] Language set to:', match.lang, match.name);
+
+    // Find all voices for this language
+    const candidates = allVoices.filter(v => v.lang.startsWith(langCode));
+
+    if (candidates.length > 0) {
+      // Prefer higher-quality voices: Google > Natural > Enhanced > Online > default
+      const ranked = candidates.sort((a, b) => {
+        const score = (v) => {
+          const n = v.name.toLowerCase();
+          if (n.includes('google')) return 5;
+          if (n.includes('natural')) return 4;
+          if (n.includes('enhanced')) return 3;
+          if (n.includes('premium')) return 3;
+          if (n.includes('online')) return 2;
+          if (!v.localService) return 1; // Remote voices are usually better
+          return 0;
+        };
+        return score(b) - score(a);
+      });
+      selectedVoice = ranked[0];
+      console.log('[Speech] Language set to:', selectedVoice.lang, selectedVoice.name,
+        `(${candidates.length} voices available, picked best quality)`);
     } else {
-      console.warn('[Speech] No voice found for language:', langCode, '- will still translate text');
+      console.warn('[Speech] No voice for:', langCode, '- will still translate text');
+    }
+
+    // Slow down for Indian languages where TTS clarity is typically lower
+    const slowLangs = ['kn', 'hi', 'ta', 'te', 'mr', 'bn', 'gu', 'ml'];
+    if (slowLangs.includes(langCode)) {
+      speechRate = Math.min(speechRate, 0.85);
+      console.log('[Speech] Rate reduced to', speechRate, 'for clarity');
     }
   }
 
