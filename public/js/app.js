@@ -113,16 +113,43 @@
     F.Haptic.vibrate('sos');
     SpeechModule.speak('Emergency SOS activated! ' + reason, SpeechModule.PRIORITY.DANGER);
 
+    const contact = F.EmergencySOS.getContact();
+
+    const processLocation = (loc) => {
+      let locText = 'Location unavailable';
+      let mapsLink = '';
+      if (loc) {
+        locText = `Location: ${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}`;
+        mapsLink = `https://maps.google.com/?q=${loc.lat},${loc.lng}`;
+      }
+      locEl.textContent = locText;
+
+      const message = `EMERGENCY SOS: VisionBridge user needs help! Reason: ${reason}. ${mapsLink ? 'Location: ' + mapsLink : locText}`;
+
+      // Automatically try to convey the message
+      if (contact) {
+        if (contact.includes('@')) {
+          // Email
+          window.open(`mailto:${contact}?subject=Emergency SOS&body=${encodeURIComponent(message)}`, '_blank');
+        } else {
+          // SMS (Phone) - handling iOS and Android differences slightly by just using standard ?body=
+          window.open(`sms:${contact}?body=${encodeURIComponent(message)}`, '_blank');
+        }
+      } else if (navigator.share) {
+        // Fallback to Native Share if no contact is set
+        navigator.share({
+          title: 'Emergency SOS',
+          text: message
+        }).catch(err => console.warn('Share failed:', err));
+      } else {
+         SpeechModule.speak('Please configure an emergency contact in settings.', SpeechModule.PRIORITY.INFO);
+      }
+    };
+
     if (locationPromise && typeof locationPromise.then === 'function') {
-      locationPromise.then(loc => {
-        if (loc) locEl.textContent = `Location: ${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}`;
-        else locEl.textContent = 'Location unavailable';
-      });
+      locationPromise.then(processLocation);
     } else {
-      F.EmergencySOS.getLocation().then(loc => {
-        if (loc) locEl.textContent = `Location: ${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}`;
-        else locEl.textContent = 'Location unavailable';
-      });
+      F.EmergencySOS.getLocation().then(processLocation);
     }
   }
 
