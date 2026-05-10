@@ -414,6 +414,7 @@ const Features = (() => {
     let battery = null;
     let level = 1;
     let charging = true;
+    let supported = false;
 
     async function init() {
       try {
@@ -421,31 +422,39 @@ const Features = (() => {
           battery = await navigator.getBattery();
           level = battery.level;
           charging = battery.charging;
+          supported = true;
           battery.addEventListener('levelchange', () => { level = battery.level; update(); });
           battery.addEventListener('chargingchange', () => { charging = battery.charging; update(); });
           update();
+        } else {
+          // Battery API not available — hide the badge
+          const el = document.getElementById('battery-indicator');
+          if (el) el.style.display = 'none';
         }
-      } catch { /* Battery API not supported */ }
+      } catch {
+        // Battery API not supported — hide the badge
+        const el = document.getElementById('battery-indicator');
+        if (el) el.style.display = 'none';
+      }
     }
 
     function update() {
       const el = document.getElementById('battery-indicator');
-      if (el) {
-        const pct = Math.round(level * 100);
-        el.textContent = charging ? `⚡${pct}%` : `🔋${pct}%`;
-        el.className = 'badge ' + (pct < 20 ? 'badge-danger' : pct < 50 ? 'badge-warn' : 'badge-ok');
-      }
+      if (!el || !supported) return;
+      const pct = Math.round(level * 100);
+      el.textContent = charging ? '\u26A1' + pct + '%' : '\uD83D\uDD0B' + pct + '%';
+      el.className = 'badge ' + (pct < 20 ? 'badge-danger' : pct < 50 ? 'badge-warn' : 'badge-ok');
     }
 
     function getRecommendedInterval(baseMs) {
-      if (charging) return baseMs;
+      if (!supported || charging) return baseMs;
       if (level < 0.1) return baseMs * 4;
       if (level < 0.2) return baseMs * 3;
       if (level < 0.4) return baseMs * 2;
       return baseMs;
     }
 
-    return { init, getRecommendedInterval, get level() { return level; }, get charging() { return charging; } };
+    return { init, getRecommendedInterval, get level() { return level; }, get charging() { return charging; }, get supported() { return supported; } };
   })();
 
   // =============================================

@@ -518,13 +518,168 @@
     }
   }
 
-  // --- Auto Scan (battery-aware) ---
+  // ==========================================
+  //   REAL-TIME CONTINUOUS DETECTION ENGINE
+  // ==========================================
+
+  let realtimeActive = false;
+  let realtimeTimer = null;
+  let prevObjects = [];           // Object labels from last frame
+  let lastGeminiTime = 0;         // Timestamp of last Gemini call
+  let lastLocalAnnounce = 0;      // Timestamp of last local announcement
+  const REALTIME_INTERVAL = 1500; // Local detection every 1.5s
+  const GEMINI_INTERVAL = 15000;  // Rich Gemini description every 15s
+  const ANNOUNCE_COOLDOWN = 3000; // Don't repeat local announcements within 3s
+
+  function startRealtime() {
+    if (realtimeActive) return;
+    realtimeActive = true;
+    prevObjects = [];
+    lastGeminiTime = 0;
+    lastLocalAnnounce = 0;
+    realtimeLoop();
+  }
+
+  function stopRealtime() {
+    realtimeActive = false;
+    if (realtimeTimer) { clearTimeout(realtimeTimer); realtimeTimer = null; }
+  }
+
+  async function realtimeLoop() {
+    if (!realtimeActive) return;
+
+    const video = document.getElementById('camera-feed');
+    if (!video || !video.videoWidth || !localDetectorReady) {
+      realtimeTimer = setTimeout(realtimeLoop, REALTIME_INTERVAL);
+      return;
+    }
+
+    try {
+      // --- Local detection (instant, every frame) ---
+      const objects = await DetectorModule.detect(video) || [];
+      const now = Date.now();
+
+      // Extract labels for comparison
+      const curLabels = objects.map(o => o.label).sort();
+      const prevLabels = prevObjects.map(o => o.label).sort();
+
+      // Detect dangers immediately
+      const result = DetectorModule.processForSpeech(objects, currentMode);
+      if (result.dangers?.length > 0) {
+        UIModule.setMode('danger');
+        UIModule.showDangers(result.dangers);
+        F.Haptic.vibrateForDangers(result.dangers);
+        F.SpatialAudio.playForDangers(result.dangers);
+
+        const critical = result.dangers.filter(d => d.severity === 'critical');
+        if (critical.length) {
+          SpeechModule.speak('Warning! ' + critical.map(d => d.description).join('. '), SpeechModule.PRIORITY.DANGER);
+        }
+      } else {
+        if (UIModule.els.statusRing.classList.contains('danger')) {
+          UIModule.showDangers([]);
+          UIModule.setMode('scanning');
+        }
+      }
+
+      // Scene change detection: announce only when objects change
+      const sceneChanged = !arraysEqual(curLabels, prevLabels);
+      if (sceneChanged && now - lastLocalAnnounce > ANNOUNCE_COOLDOWN && !isProcessing) {
+        const newItems = curLabels.filter(l => !prevLabels.includes(l));
+        const goneItems = prevLabels.filter(l => !curLabels.includes(l));
+
+        let announcement = '';
+        if (newItems.length && goneItems.length) {
+          announcement = `Now I see: ${countItems(curLabels)}.`;
+        } else if (newItems.length) {
+          announcement = `${newItems.join(', ')} appeared.`;
+        } else if (goneItems.length) {
+          announcement = `${goneItems.join(', ')} no longer visible.`;
+        }
+
+        if (announcement && currentMode !== 'read' && currentMode !== 'measure') {
+          lastDescription = result.description || result.summary || announcement;
+          UIModule.addDescription(lastDescription);
+          // Only speak short local updates, don't talk over Gemini
+          if (!SpeechModule.isSpeakingNow()) {
+            SpeechModule.speak(announcement, SpeechModule.PRIORITY.INFO);
+          }
+          lastLocalAnnounce = now;
+          F.ScanHistory.add({ mode: currentMode, text: lastDescription });
+        }
+      }
+
+      prevObjects = objects;
+
+      // Scene memory + indoor nav (runs silently)
+      F.SceneMemory.detectChanges(objects);
+      F.IndoorNav.recognizeLocation(objects);
+
+      // Record performance
+      objects.forEach(o => { if (o.score) P.recordConfidence(Math.round(o.score * 100)); });
+
+      // --- Gemini enrichment (every 15s, non-blocking) ---
+      if (geminiAvailable && now - lastGeminiTime > GEMINI_INTERVAL && !isProcessing
+          && currentMode !== 'read' && currentMode !== 'measure') {
+        lastGeminiTime = now;
+        // Fire and forget - don't block the realtime loop
+        enrichWithGemini();
+      }
+
+    } catch (e) {
+      console.warn('[Realtime] Error:', e.message);
+    }
+
+    // Schedule next frame
+    const interval = F.BatteryAware.getRecommendedInterval(REALTIME_INTERVAL);
+    realtimeTimer = setTimeout(realtimeLoop, interval);
+  }
+
+  async function enrichWithGemini() {
+    try {
+      const frame = CameraModule.captureFrame();
+      if (!frame) return;
+      const result = await Promise.race([
+        ApiModule.analyzeScene(frame, currentMode),
+        new Promise(r => setTimeout(() => r(null), 12000))
+      ]);
+      P.recordAPI(!!result && !result._cached);
+
+      if (result?.description && !result._cached && !result.description.includes('AI service')) {
+        lastDescription = result.description;
+        UIModule.addDescription(result.description);
+        if (!SpeechModule.isSpeakingNow()) {
+          SpeechModule.speak(result.description, SpeechModule.PRIORITY.DESCRIPTION);
+        }
+        if (result.dangers?.length) {
+          UIModule.showDangers(result.dangers);
+          F.SpatialAudio.playForDangers(result.dangers);
+        }
+      }
+    } catch { P.recordAPI(false); }
+  }
+
+  // Helpers
+  function arraysEqual(a, b) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) { if (a[i] !== b[i]) return false; }
+    return true;
+  }
+
+  function countItems(labels) {
+    const counts = {};
+    labels.forEach(l => { counts[l] = (counts[l] || 0) + 1; });
+    return Object.entries(counts).map(([k, v]) => v > 1 ? `${v} ${k}s` : k).join(', ');
+  }
+
+  // --- Auto Scan toggle now activates real-time mode ---
   function startAutoScan() {
     stopAutoScan();
-    performScan();
-    const interval = F.BatteryAware.getRecommendedInterval(scanInterval);
-    autoScanTimer = setInterval(() => { if (!isProcessing) performScan(); }, interval);
+    startRealtime();
   }
-  function stopAutoScan() { if (autoScanTimer) { clearInterval(autoScanTimer); autoScanTimer = null; } }
+  function stopAutoScan() {
+    stopRealtime();
+  }
 
 })();
+
