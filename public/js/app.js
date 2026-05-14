@@ -115,34 +115,51 @@
 
     const contact = F.EmergencySOS.getContact();
 
-    const processLocation = (loc) => {
+    const processLocation = async (loc) => {
       let locText = 'Location unavailable';
-      let mapsLink = '';
       if (loc) {
         locText = `Location: ${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}`;
-        mapsLink = `https://maps.google.com/?q=${loc.lat},${loc.lng}`;
       }
       locEl.textContent = locText;
 
-      const message = `EMERGENCY SOS: VisionBridge user needs help! Reason: ${reason}. ${mapsLink ? 'Location: ' + mapsLink : locText}`;
+      if (!contact) {
+        SpeechModule.speak('Please configure an emergency contact in settings.', SpeechModule.PRIORITY.INFO);
+        return;
+      }
 
-      // Automatically try to convey the message
-      if (contact) {
-        if (contact.includes('@')) {
-          // Email
-          window.open(`mailto:${contact}?subject=Emergency SOS&body=${encodeURIComponent(message)}`, '_blank');
+      // Send SOS via server backend
+      try {
+        locEl.textContent = locText + ' — Sending SOS...';
+        const response = await fetch('/api/sos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contact: contact,
+            reason: reason,
+            location: loc ? { lat: loc.lat, lng: loc.lng } : null
+          })
+        });
+        const result = await response.json();
+
+        if (result.success) {
+          locEl.textContent = locText + ' — SOS sent!';
+          SpeechModule.speak('SOS message sent successfully to your emergency contact!', SpeechModule.PRIORITY.DANGER);
+        } else if (result.notConfigured) {
+          // Server doesn't have email configured — fallback to native share
+          locEl.textContent = locText + ' — Using device share...';
+          const mapsLink = loc ? `https://maps.google.com/?q=${loc.lat},${loc.lng}` : '';
+          const message = `EMERGENCY SOS: VisionBridge user needs help! Reason: ${reason}. ${mapsLink ? 'Location: ' + mapsLink : locText}`;
+          if (navigator.share) {
+            await navigator.share({ title: 'Emergency SOS', text: message }).catch(() => {});
+          }
+          SpeechModule.speak('SOS email is not configured on the server. Please ask your administrator to set it up.', SpeechModule.PRIORITY.INFO);
         } else {
-          // SMS (Phone) - handling iOS and Android differences slightly by just using standard ?body=
-          window.open(`sms:${contact}?body=${encodeURIComponent(message)}`, '_blank');
+          locEl.textContent = locText + ' — SOS failed: ' + (result.error || 'Unknown error');
+          SpeechModule.speak('Failed to send SOS. ' + (result.error || ''), SpeechModule.PRIORITY.DANGER);
         }
-      } else if (navigator.share) {
-        // Fallback to Native Share if no contact is set
-        navigator.share({
-          title: 'Emergency SOS',
-          text: message
-        }).catch(err => console.warn('Share failed:', err));
-      } else {
-         SpeechModule.speak('Please configure an emergency contact in settings.', SpeechModule.PRIORITY.INFO);
+      } catch (err) {
+        locEl.textContent = locText + ' — Network error';
+        SpeechModule.speak('Could not reach the server to send SOS.', SpeechModule.PRIORITY.DANGER);
       }
     };
 

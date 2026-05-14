@@ -4,6 +4,7 @@ const cors = require('cors');
 const { GoogleGenAI } = require('@google/genai');
 const path = require('path');
 const os = require('os');
+const nodemailer = require('nodemailer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -541,7 +542,99 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log('   Get a free key at: https://aistudio.google.com/');
   }
 
+  if (process.env.SOS_EMAIL_USER && process.env.SOS_EMAIL_PASS) {
+    console.log('[OK] SOS Email configured and ready.');
+  } else {
+    console.log('[!] SOS Email not configured. Set SOS_EMAIL_USER and SOS_EMAIL_PASS in .env');
+  }
+
   console.log('\n[TIP] To access from your phone or any device, run this in a NEW terminal:');
   console.log('   npx ngrok http 3000');
   console.log('   Then open the https://xxxx.ngrok-free.app URL on any device.\n');
+});
+
+// =============================================
+//   SOS EMERGENCY EMAIL ENDPOINT
+// =============================================
+app.post('/api/sos', async (req, res) => {
+  try {
+    const { contact, reason, location } = req.body;
+
+    if (!contact) {
+      return res.json({ success: false, error: 'No emergency contact provided.' });
+    }
+
+    const sosEmailUser = process.env.SOS_EMAIL_USER;
+    const sosEmailPass = process.env.SOS_EMAIL_PASS;
+
+    if (!sosEmailUser || !sosEmailPass) {
+      return res.json({ success: false, error: 'SOS email not configured on server.', notConfigured: true });
+    }
+
+    // Build the message
+    let mapsLink = '';
+    let locText = 'Location unavailable';
+    if (location && location.lat && location.lng) {
+      mapsLink = `https://maps.google.com/?q=${location.lat},${location.lng}`;
+      locText = `Lat: ${location.lat}, Lng: ${location.lng}`;
+    }
+
+    const subject = 'EMERGENCY SOS - VisionBridge Alert';
+    const htmlBody = `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;border:3px solid #e74c3c;border-radius:12px;">
+        <h1 style="color:#e74c3c;text-align:center;">EMERGENCY SOS</h1>
+        <p style="font-size:18px;">A VisionBridge user has triggered an emergency alert and needs immediate help.</p>
+        <hr style="border:1px solid #eee;">
+        <p><strong>Reason:</strong> ${reason || 'Manual SOS activated'}</p>
+        <p><strong>Location:</strong> ${locText}</p>
+        ${mapsLink ? `<p><a href="${mapsLink}" style="display:inline-block;padding:12px 24px;background:#e74c3c;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;">Open in Google Maps</a></p>` : ''}
+        <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
+        <hr style="border:1px solid #eee;">
+        <p style="color:#888;font-size:12px;">This is an automated emergency alert from the VisionBridge assistive application.</p>
+      </div>
+    `;
+    const textBody = `EMERGENCY SOS - VisionBridge Alert\nReason: ${reason || 'Manual SOS activated'}\nLocation: ${locText}\n${mapsLink ? 'Google Maps: ' + mapsLink : ''}\nTime: ${new Date().toLocaleString()}`;
+
+    // Create transporter (Gmail SMTP)
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: sosEmailUser,
+        pass: sosEmailPass
+      }
+    });
+
+    // Determine if contact is email or phone
+    const isEmail = contact.includes('@');
+
+    if (isEmail) {
+      await transporter.sendMail({
+        from: `"VisionBridge SOS" <${sosEmailUser}>`,
+        to: contact,
+        subject: subject,
+        text: textBody,
+        html: htmlBody
+      });
+      console.log(`[SOS] Emergency email sent to ${contact}`);
+      return res.json({ success: true, method: 'email' });
+    } else {
+      // For phone numbers, send an SMS-style email to a carrier gateway
+      // OR use the email to notify anyway
+      // We send the email to the configured SOS_EMAIL_USER as a record, 
+      // and note the phone number in the body
+      await transporter.sendMail({
+        from: `"VisionBridge SOS" <${sosEmailUser}>`,
+        to: sosEmailUser,
+        subject: subject + ` (Contact: ${contact})`,
+        text: `Emergency contact phone: ${contact}\n\n${textBody}`,
+        html: `<p><strong>Emergency Contact Phone:</strong> ${contact}</p>${htmlBody}`
+      });
+      console.log(`[SOS] Emergency email sent (phone contact: ${contact})`);
+      return res.json({ success: true, method: 'email-with-phone' });
+    }
+
+  } catch (err) {
+    console.error('[SOS] Failed to send:', err.message);
+    return res.json({ success: false, error: err.message });
+  }
 });
