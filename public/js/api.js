@@ -1,4 +1,4 @@
-﻿/**
+/**
  * api.js â€” Server communication module for VisionBridge
  * Multi-layer retry: server retries internally (4Ã—4 models), 
  * then client retries the whole request 3 times with delays.
@@ -7,16 +7,16 @@
 const ApiModule = (() => {
   const BASE = '';
 
-  // Generic fetch with 3 retries and escalating delays (3s, 6s, 10s)
-  async function fetchWithRetry(url, options, maxAttempts = 3) {
-    const delays = [3000, 6000, 10000];
+  // Generic fetch with 2 retries and fast delays (1s, 2s)
+  async function fetchWithRetry(url, options, maxAttempts = 2) {
+    const delays = [1000, 2000];
     let lastErr;
     let lastData;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 60000); // 60s timeout
+        const timeout = setTimeout(() => controller.abort(), 20000); // 20s timeout
 
         const res = await fetch(url, { ...options, signal: controller.signal });
         clearTimeout(timeout);

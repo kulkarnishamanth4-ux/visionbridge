@@ -48,8 +48,8 @@ function isRetryable(err) {
  * Per-model: up to MAX_RETRIES attempts. Falls through to next model on exhaustion.
  */
 async function callWithFallback(client, requestConfig) {
-  const MAX_RETRIES = 4;
-  const BASE_DELAY_MS = 2000;  // 2s, 4s, 8s, 16s
+  const MAX_RETRIES = 2;
+  const BASE_DELAY_MS = 1000;  // 1s, 2s
   let lastErr;
 
   for (const model of MODELS) {

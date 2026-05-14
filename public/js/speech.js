@@ -100,32 +100,52 @@ const SpeechModule = (() => {
         if (onTranscriptCallback) {
           onTranscriptCallback(last[0].transcript.trim());
         }
-      } else if (transcript.includes(wakeWord)) {
+      } else if (matchesWakeWord(transcript)) {
         // Wake word detected
         console.log('[Speech] Wake word detected!');
         awaitingQuestion = true;
         if (onWakeWordCallback) onWakeWordCallback();
 
-        // Auto-reset after 10 seconds if no question received
-        setTimeout(() => { awaitingQuestion = false; }, 10000);
+        // Auto-reset after 15 seconds if no question received
+        setTimeout(() => { awaitingQuestion = false; }, 15000);
       }
     };
 
     recognition.onerror = (event) => {
       console.warn('[Speech] Recognition error:', event.error);
-      if (event.error === 'not-allowed') {
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
         recognitionSupported = false;
       }
+      // On network or transient errors, let onend handle restart
     };
 
     recognition.onend = () => {
       // Auto-restart if we should still be listening
-      if (isListening) {
-        try { recognition.start(); } catch (e) { /* already started */ }
+      if (isListening && recognitionSupported) {
+        setTimeout(() => {
+          try { recognition.start(); } catch (e) { /* already started */ }
+        }, 300); // Small delay prevents rapid restart loops
       }
     };
 
     return true;
+  }
+
+  // Flexible wake word matching: handles partial recognition and common misheard variants
+  function matchesWakeWord(transcript) {
+    if (transcript.includes(wakeWord)) return true;
+    // Handle common misheard variants
+    const words = wakeWord.split(' ');
+    if (words.length >= 2) {
+      // Match if at least 2 words appear close together
+      const allPresent = words.every(w => transcript.includes(w));
+      if (allPresent) return true;
+    }
+    // Fuzzy: "hey vision" can be heard as "a vision", "hey visions", etc.
+    const fuzzy = wakeWord.replace(/\s+/g, '').toLowerCase();
+    const tClean = transcript.replace(/\s+/g, '').toLowerCase();
+    if (tClean.includes(fuzzy)) return true;
+    return false;
   }
 
   function startListening() {
@@ -330,11 +350,15 @@ const SpeechModule = (() => {
   function onSpeakStart(cb) { onSpeakStartCallback = cb; }
   function onSpeakEnd(cb) { onSpeakEndCallback = cb; }
 
+  function isSpeakingNow() {
+    return isSpeaking || synth.speaking;
+  }
+
   return {
     initRecognition, startListening, stopListening,
     triggerQuestionMode,
     initSynthesis, loadVoices,
-    speak, stopSpeaking,
+    speak, stopSpeaking, isSpeakingNow,
     unlockAudio, playDangerBeep,
     setWakeWord, setVoice, setRate, setLanguage,
     onWakeWord, onTranscript, onSpeakStart, onSpeakEnd,

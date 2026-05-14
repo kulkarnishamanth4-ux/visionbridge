@@ -471,7 +471,7 @@
       }
     }
 
-    // GEMINI ENHANCEMENT (optional, 15s timeout)
+    // GEMINI ENHANCEMENT (optional, 10s timeout)
     let geminiResult = null;
     if (geminiAvailable) {
       try {
@@ -479,7 +479,7 @@
         if (frame) {
           geminiResult = await Promise.race([
             ApiModule.analyzeScene(frame, currentMode),
-            new Promise(r => setTimeout(() => r(null), 15000))
+            new Promise(r => setTimeout(() => r(null), 10000))
           ]);
           P.recordAPI(!!geminiResult && !geminiResult._cached);
         }
@@ -571,9 +571,9 @@
   let prevObjects = [];           // Object labels from last frame
   let lastGeminiTime = 0;         // Timestamp of last Gemini call
   let lastLocalAnnounce = 0;      // Timestamp of last local announcement
-  const REALTIME_INTERVAL = 1500; // Local detection every 1.5s
-  const GEMINI_INTERVAL = 15000;  // Rich Gemini description every 15s
-  const ANNOUNCE_COOLDOWN = 3000; // Don't repeat local announcements within 3s
+  const REALTIME_INTERVAL = 1000; // Local detection every 1s
+  const GEMINI_INTERVAL = 10000;  // Rich Gemini description every 10s
+  const ANNOUNCE_COOLDOWN = 2000; // Don't repeat local announcements within 2s
 
   function startRealtime() {
     if (realtimeActive) return;
@@ -685,7 +685,7 @@
       if (!frame) return;
       const result = await Promise.race([
         ApiModule.analyzeScene(frame, currentMode),
-        new Promise(r => setTimeout(() => r(null), 12000))
+        new Promise(r => setTimeout(() => r(null), 8000))
       ]);
       P.recordAPI(!!result && !result._cached);
 

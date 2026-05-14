@@ -417,9 +417,25 @@ const Features = (() => {
     let supported = false;
 
     async function init() {
+      const el = document.getElementById('battery-indicator');
       try {
         if (navigator.getBattery) {
           battery = await navigator.getBattery();
+
+          // Validate: some desktop browsers return the API but with bogus/default values
+          // A real battery will have level as a finite number between 0 and 1
+          const realBattery = typeof battery.level === 'number'
+            && isFinite(battery.level)
+            && battery.level >= 0 && battery.level <= 1
+            // Desktop Chrome often returns level=1, charging=true even with no battery
+            // If we're on a non-mobile device with 100% + charging, it's likely fake
+            && !(battery.level === 1 && battery.charging && !isMobileDevice());
+
+          if (!realBattery) {
+            if (el) el.style.display = 'none';
+            return;
+          }
+
           level = battery.level;
           charging = battery.charging;
           supported = true;
@@ -427,15 +443,16 @@ const Features = (() => {
           battery.addEventListener('chargingchange', () => { charging = battery.charging; update(); });
           update();
         } else {
-          // Battery API not available — hide the badge
-          const el = document.getElementById('battery-indicator');
           if (el) el.style.display = 'none';
         }
       } catch {
-        // Battery API not supported — hide the badge
-        const el = document.getElementById('battery-indicator');
         if (el) el.style.display = 'none';
       }
+    }
+
+    function isMobileDevice() {
+      return /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+        || ('ontouchstart' in window && navigator.maxTouchPoints > 1);
     }
 
     function update() {
