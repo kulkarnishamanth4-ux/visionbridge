@@ -221,19 +221,32 @@
           <input type="text" id="wake-word-input" value="hey vision">
         </div>
         <div class="setting-group">
-          <label for="sos-type">Emergency contact type</label>
+          <label for="sos-type"><strong>&#x1F198; Emergency Contact</strong></label>
           <select id="sos-type" aria-label="Select contact type">
-            <option value="email">Email address</option>
-            <option value="phone">Phone number (will place a call)</option>
+            <option value="email">&#x2709; Email (sends SOS email automatically)</option>
+            <option value="phone">&#x1F4DE; Phone (places a call instantly)</option>
           </select>
         </div>
         <div class="setting-group" id="sos-email-group">
-          <label for="sos-contact-email">Emergency email address</label>
-          <input type="email" id="sos-contact-email" placeholder="example@gmail.com" value="">
+          <label for="sos-contact-email">Email address <small style="color:#888">(format: abc@email.com)</small></label>
+          <input type="email" id="sos-contact-email" placeholder="abc@email.com" value="" autocomplete="email">
         </div>
         <div class="setting-group hidden" id="sos-phone-group">
-          <label for="sos-contact-phone">Emergency phone number</label>
-          <input type="tel" id="sos-contact-phone" placeholder="+91 98765 43210" value="">
+          <label for="sos-contact-phone">Phone number <small style="color:#888">(format: +919999988888)</small></label>
+          <input type="tel" id="sos-contact-phone" placeholder="+919999988888" value="" autocomplete="tel">
+        </div>
+        <div class="setting-group">
+          <button id="sos-send-otp" class="modal-close-btn" style="background:#7b61ff;margin-bottom:0;padding:10px">Send Verification Code</button>
+        </div>
+        <div class="setting-group hidden" id="sos-otp-group">
+          <label for="sos-otp-input">Enter the 6-digit code</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="text" id="sos-otp-input" placeholder="123456" maxlength="6" style="flex:1;text-align:center;letter-spacing:4px;font-size:18px;font-weight:bold">
+            <button id="sos-verify-otp" class="modal-close-btn" style="background:#00d4ff;margin-bottom:0;padding:10px 16px">Verify</button>
+          </div>
+        </div>
+        <div id="sos-status" class="setting-group" style="display:none">
+          <p id="sos-status-text" style="margin:0;padding:8px 12px;border-radius:8px;font-size:14px;font-weight:500"></p>
         </div>
         <div class="setting-group toggle-group">
           <label for="camera-preview-toggle">Show camera preview</label>

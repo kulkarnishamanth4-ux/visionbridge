@@ -47,38 +47,154 @@
     });
   }
 
-  // Load SOS contact settings
+  // ===== SOS SETTINGS WITH OTP VERIFICATION =====
   const sosTypeSelect = document.getElementById('sos-type');
   const sosEmailInput = document.getElementById('sos-contact-email');
   const sosPhoneInput = document.getElementById('sos-contact-phone');
   const sosEmailGroup = document.getElementById('sos-email-group');
   const sosPhoneGroup = document.getElementById('sos-phone-group');
+  const sosSendOtpBtn = document.getElementById('sos-send-otp');
+  const sosOtpGroup = document.getElementById('sos-otp-group');
+  const sosOtpInput = document.getElementById('sos-otp-input');
+  const sosVerifyBtn = document.getElementById('sos-verify-otp');
+  const sosStatusDiv = document.getElementById('sos-status');
+  const sosStatusText = document.getElementById('sos-status-text');
 
-  if (sosTypeSelect) {
-    sosTypeSelect.value = F.EmergencySOS.getContactType();
-    // Show/hide the correct field on load
-    if (F.EmergencySOS.getContactType() === 'phone') {
+  function showSosStatus(msg, type) {
+    if (!sosStatusDiv || !sosStatusText) return;
+    sosStatusDiv.style.display = 'block';
+    sosStatusText.textContent = msg;
+    sosStatusText.style.background = type === 'ok' ? '#1a3a1a' : type === 'err' ? '#3a1a1a' : '#1a2a3a';
+    sosStatusText.style.color = type === 'ok' ? '#4ade80' : type === 'err' ? '#f87171' : '#60a5fa';
+  }
+
+  function updateSosTypeUI(type) {
+    if (type === 'phone') {
       if (sosEmailGroup) sosEmailGroup.classList.add('hidden');
       if (sosPhoneGroup) sosPhoneGroup.classList.remove('hidden');
+    } else {
+      if (sosEmailGroup) sosEmailGroup.classList.remove('hidden');
+      if (sosPhoneGroup) sosPhoneGroup.classList.add('hidden');
     }
+  }
+
+  // Load saved state
+  if (sosTypeSelect) {
+    sosTypeSelect.value = F.EmergencySOS.getContactType();
+    updateSosTypeUI(F.EmergencySOS.getContactType());
     sosTypeSelect.addEventListener('change', (e) => {
       F.EmergencySOS.setContactType(e.target.value);
-      if (e.target.value === 'phone') {
-        if (sosEmailGroup) sosEmailGroup.classList.add('hidden');
-        if (sosPhoneGroup) sosPhoneGroup.classList.remove('hidden');
-      } else {
-        if (sosEmailGroup) sosEmailGroup.classList.remove('hidden');
-        if (sosPhoneGroup) sosPhoneGroup.classList.add('hidden');
-      }
+      updateSosTypeUI(e.target.value);
+      if (sosOtpGroup) sosOtpGroup.classList.add('hidden');
+      if (sosStatusDiv) sosStatusDiv.style.display = 'none';
     });
   }
   if (sosEmailInput) {
     sosEmailInput.value = F.EmergencySOS.getEmail();
-    sosEmailInput.addEventListener('change', (e) => F.EmergencySOS.setEmail(e.target.value));
+    sosEmailInput.addEventListener('input', (e) => {
+      F.EmergencySOS.setEmail(e.target.value.trim());
+      if (sosOtpGroup) sosOtpGroup.classList.add('hidden');
+      if (sosStatusDiv) sosStatusDiv.style.display = 'none';
+    });
   }
   if (sosPhoneInput) {
     sosPhoneInput.value = F.EmergencySOS.getPhone();
-    sosPhoneInput.addEventListener('change', (e) => F.EmergencySOS.setPhone(e.target.value));
+    sosPhoneInput.addEventListener('input', (e) => {
+      F.EmergencySOS.setPhone(e.target.value.trim());
+      if (sosOtpGroup) sosOtpGroup.classList.add('hidden');
+      if (sosStatusDiv) sosStatusDiv.style.display = 'none';
+    });
+  }
+
+  // Show verified badge if already verified
+  if (F.EmergencySOS.isVerified() && F.EmergencySOS.getContact()) {
+    showSosStatus('\u2705 Contact verified: ' + F.EmergencySOS.getContact(), 'ok');
+  }
+
+  // SEND OTP button
+  if (sosSendOtpBtn) {
+    sosSendOtpBtn.addEventListener('click', async () => {
+      const type = F.EmergencySOS.getContactType();
+      const contact = F.EmergencySOS.getContact();
+      if (!contact) {
+        showSosStatus('Please enter a contact first.', 'err');
+        return;
+      }
+      // Validate format
+      if (type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact)) {
+        showSosStatus('Invalid email. Use format: abc@email.com', 'err');
+        return;
+      }
+      if (type === 'phone' && !/^\+\d{10,15}$/.test(contact.replace(/[\s-]/g, ''))) {
+        showSosStatus('Invalid phone. Use format: +919999988888', 'err');
+        return;
+      }
+
+      sosSendOtpBtn.disabled = true;
+      sosSendOtpBtn.textContent = 'Sending...';
+      showSosStatus('Sending verification code...', 'info');
+
+      try {
+        const res = await fetch('/api/send-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contact, type })
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (data.directVerify) {
+            // Phone: verified directly by format (no SMS service)
+            F.EmergencySOS.setVerified(true);
+            showSosStatus('\u2705 Phone number verified: ' + contact, 'ok');
+          } else {
+            // Email: OTP sent, show input field
+            showSosStatus('\u2709\uFE0F Code sent to ' + contact + '. Check your inbox.', 'ok');
+            if (sosOtpGroup) sosOtpGroup.classList.remove('hidden');
+            if (sosOtpInput) sosOtpInput.focus();
+          }
+        } else {
+          showSosStatus(data.error || 'Failed to send OTP.', 'err');
+        }
+      } catch {
+        showSosStatus('Network error. Check your connection.', 'err');
+      }
+      sosSendOtpBtn.disabled = false;
+      sosSendOtpBtn.textContent = 'Send Verification Code';
+    });
+  }
+
+  // VERIFY OTP button
+  if (sosVerifyBtn) {
+    sosVerifyBtn.addEventListener('click', async () => {
+      const otp = sosOtpInput?.value?.trim();
+      const contact = F.EmergencySOS.getContact();
+      if (!otp || otp.length !== 6) {
+        showSosStatus('Enter the 6-digit code.', 'err');
+        return;
+      }
+      sosVerifyBtn.disabled = true;
+      sosVerifyBtn.textContent = 'Verifying...';
+      try {
+        const res = await fetch('/api/verify-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contact, otp })
+        });
+        const data = await res.json();
+        if (data.success) {
+          F.EmergencySOS.setVerified(true);
+          showSosStatus('\u2705 Contact verified: ' + contact, 'ok');
+          if (sosOtpGroup) sosOtpGroup.classList.add('hidden');
+          SpeechModule.speak('Emergency contact verified successfully.', SpeechModule.PRIORITY.INFO);
+        } else {
+          showSosStatus(data.error || 'Verification failed.', 'err');
+        }
+      } catch {
+        showSosStatus('Network error.', 'err');
+      }
+      sosVerifyBtn.disabled = false;
+      sosVerifyBtn.textContent = 'Verify';
+    });
   }
 
   // --- Mode Descriptions ---
@@ -129,7 +245,7 @@
     } catch { /* no mic access */ }
   });
 
-  // --- SOS handler ---
+  // --- SOS handler (fully automated, zero user interaction) ---
   function handleSOS(reason, locationPromise) {
     const panel = document.getElementById('sos-panel');
     const reasonEl = document.getElementById('sos-reason');
@@ -142,23 +258,30 @@
 
     const contactType = F.EmergencySOS.getContactType();
     const contact = F.EmergencySOS.getContact();
+    const isVerified = F.EmergencySOS.isVerified();
 
     const processLocation = async (loc) => {
       let locText = 'Location unavailable';
-      let mapsLink = '';
       if (loc) {
         locText = `Lat: ${loc.lat.toFixed(5)}, Lng: ${loc.lng.toFixed(5)}`;
-        mapsLink = `https://maps.google.com/?q=${loc.lat},${loc.lng}`;
       }
       locEl.textContent = locText;
 
+      // No contact configured
       if (!contact) {
-        SpeechModule.speak('No emergency contact configured. Please go to settings and add a phone number or email.', SpeechModule.PRIORITY.DANGER);
         locEl.textContent = locText + ' \u2014 No contact configured!';
+        SpeechModule.speak('No emergency contact set. Open settings to add one.', SpeechModule.PRIORITY.DANGER);
         return;
       }
 
-      // ---- PHONE: Instantly place a call ----
+      // Not verified
+      if (!isVerified) {
+        locEl.textContent = locText + ' \u2014 Contact not verified!';
+        SpeechModule.speak('Emergency contact is not verified. Open settings and verify your contact first.', SpeechModule.PRIORITY.DANGER);
+        return;
+      }
+
+      // ---- PHONE: Instantly place a call (zero interaction) ----
       if (contactType === 'phone') {
         locEl.textContent = locText + ' \u2014 Calling ' + contact + '...';
         SpeechModule.speak('Calling your emergency contact now.', SpeechModule.PRIORITY.DANGER);
@@ -166,55 +289,29 @@
         return;
       }
 
-      // ---- EMAIL: Send directly via formsubmit.co (no server config needed) ----
+      // ---- EMAIL: Send via server (fully automated, zero interaction) ----
       locEl.textContent = locText + ' \u2014 Sending SOS email...';
-      const messageBody = `EMERGENCY SOS - VisionBridge Alert\n\nA VisionBridge user needs immediate help.\n\nReason: ${reason}\nLocation: ${locText}\n${mapsLink ? 'Google Maps: ' + mapsLink : ''}\nTime: ${new Date().toLocaleString()}\n\nThis is an automated emergency alert from VisionBridge.`;
-
-      try {
-        // Try formsubmit.co first (works without any server config)
-        const formRes = await fetch('https://formsubmit.co/ajax/' + encodeURIComponent(contact), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({
-            _subject: 'EMERGENCY SOS - VisionBridge Alert',
-            reason: reason,
-            location: locText,
-            maps_link: mapsLink || 'Not available',
-            time: new Date().toLocaleString(),
-            message: messageBody
-          })
-        });
-        const formData = await formRes.json();
-
-        if (formData.success === 'true' || formData.success === true) {
-          locEl.textContent = locText + ' \u2014 SOS email sent!';
-          SpeechModule.speak('SOS email sent successfully to ' + contact, SpeechModule.PRIORITY.DANGER);
-          return;
-        }
-      } catch { /* formsubmit failed, try server fallback */ }
-
-      // Fallback: try server-side Nodemailer
       try {
         const response = await fetch('/api/sos', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contact, reason, location: loc ? { lat: loc.lat, lng: loc.lng } : null })
+          body: JSON.stringify({
+            contact,
+            reason,
+            location: loc ? { lat: loc.lat, lng: loc.lng } : null
+          })
         });
         const result = await response.json();
         if (result.success) {
-          locEl.textContent = locText + ' \u2014 SOS email sent!';
-          SpeechModule.speak('SOS email sent to ' + contact, SpeechModule.PRIORITY.DANGER);
-          return;
+          locEl.textContent = locText + ' \u2014 SOS email sent to ' + contact + '!';
+          SpeechModule.speak('SOS email sent successfully to ' + contact, SpeechModule.PRIORITY.DANGER);
+        } else {
+          locEl.textContent = locText + ' \u2014 Failed: ' + (result.error || 'Unknown error');
+          SpeechModule.speak('Failed to send SOS. ' + (result.error || ''), SpeechModule.PRIORITY.DANGER);
         }
-      } catch { /* server also failed */ }
-
-      // Last resort: native share
-      locEl.textContent = locText + ' \u2014 Opening share...';
-      SpeechModule.speak('Opening share to send your SOS message.', SpeechModule.PRIORITY.DANGER);
-      if (navigator.share) {
-        await navigator.share({ title: 'EMERGENCY SOS', text: messageBody }).catch(() => {});
-      } else {
-        window.open('mailto:' + contact + '?subject=EMERGENCY SOS&body=' + encodeURIComponent(messageBody), '_blank');
+      } catch {
+        locEl.textContent = locText + ' \u2014 Network error';
+        SpeechModule.speak('Network error. Could not send SOS email.', SpeechModule.PRIORITY.DANGER);
       }
     };
 

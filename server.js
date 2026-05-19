@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
 const { GoogleGenAI } = require('@google/genai');
 const path = require('path');
 const os = require('os');
@@ -8,17 +9,15 @@ const nodemailer = require('nodemailer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-// Fallback model chain -- tried in order until one succeeds
 const MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-lite'];
 
-// --- Response cache: stores last successful result per endpoint so we never show "service busy" ---
-const responseCache = {
-  analyze: null,
-  measure: null,
-  ask: null
-};
+const responseCache = { analyze: null, measure: null, ask: null };
+
+// --- OTP store: { contact: { otp, expiresAt, verified } } ---
+const otpStore = {};
 
 // --- Middleware ---
+app.use(compression());
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -594,24 +593,97 @@ app.post('/api/translate', async (req, res) => {
 });
 
 // =============================================
-//   SOS EMERGENCY EMAIL ENDPOINT
+//   SMTP TRANSPORTER HELPER
+// =============================================
+function getTransporter() {
+  const user = process.env.SOS_EMAIL_USER;
+  const pass = process.env.SOS_EMAIL_PASS;
+  if (!user || !pass) return null;
+  return nodemailer.createTransport({ service: 'gmail', auth: { user, pass } });
+}
+
+// =============================================
+//   OTP VERIFICATION ENDPOINTS
+// =============================================
+app.post('/api/send-otp', async (req, res) => {
+  try {
+    const { contact, type } = req.body;
+    if (!contact || !type) {
+      return res.json({ success: false, error: 'Contact and type are required.' });
+    }
+
+    // Validate format
+    if (type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact)) {
+      return res.json({ success: false, error: 'Invalid email format. Use: abc@email.com' });
+    }
+    if (type === 'phone' && !/^\+\d{10,15}$/.test(contact.replace(/[\s-]/g, ''))) {
+      return res.json({ success: false, error: 'Invalid phone format. Use: +919999988888' });
+    }
+
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
+    otpStore[contact] = { otp, expiresAt: Date.now() + 10 * 60 * 1000, verified: false };
+
+    if (type === 'email') {
+      const transporter = getTransporter();
+      if (!transporter) {
+        return res.json({ success: false, error: 'Email service not configured. Set SOS_EMAIL_USER and SOS_EMAIL_PASS in Render environment variables.' });
+      }
+      await transporter.sendMail({
+        from: `"VisionBridge" <${process.env.SOS_EMAIL_USER}>`,
+        to: contact,
+        subject: 'VisionBridge - Verify your emergency contact',
+        text: `Your VisionBridge verification code is: ${otp}\n\nThis code expires in 10 minutes.`,
+        html: `<div style="font-family:Arial,sans-serif;max-width:400px;margin:0 auto;padding:20px;border:2px solid #7b61ff;border-radius:12px;text-align:center;"><h2 style="color:#7b61ff;">VisionBridge Verification</h2><p style="font-size:16px;">Your verification code is:</p><h1 style="font-size:36px;letter-spacing:8px;color:#00d4ff;">${otp}</h1><p style="color:#888;">This code expires in 10 minutes.</p></div>`
+      });
+      console.log(`[OTP] Sent to email: ${contact}`);
+      return res.json({ success: true, message: 'OTP sent to your email.' });
+    }
+
+    if (type === 'phone') {
+      // Phone OTP: we can't send SMS without Twilio, but we verify the format
+      // For demo: the OTP is logged server-side and returned in a hint
+      console.log(`[OTP] Phone verification for ${contact}: ${otp}`);
+      // In production, integrate Twilio here
+      return res.json({ success: true, message: 'Phone verified by format. For SMS OTP, Twilio integration is required.', directVerify: true });
+    }
+
+    res.json({ success: false, error: 'Unknown contact type.' });
+  } catch (err) {
+    console.error('[OTP] Error:', err.message);
+    res.json({ success: false, error: 'Failed to send OTP: ' + err.message });
+  }
+});
+
+app.post('/api/verify-otp', (req, res) => {
+  const { contact, otp } = req.body;
+  const entry = otpStore[contact];
+
+  if (!entry) {
+    return res.json({ success: false, error: 'No OTP was sent to this contact. Please request a new one.' });
+  }
+  if (Date.now() > entry.expiresAt) {
+    delete otpStore[contact];
+    return res.json({ success: false, error: 'OTP expired. Please request a new one.' });
+  }
+  if (entry.otp !== otp) {
+    return res.json({ success: false, error: 'Incorrect OTP. Please try again.' });
+  }
+
+  entry.verified = true;
+  console.log(`[OTP] Contact verified: ${contact}`);
+  res.json({ success: true, message: 'Contact verified successfully!' });
+});
+
+// =============================================
+//   SOS EMERGENCY ENDPOINT
 // =============================================
 app.post('/api/sos', async (req, res) => {
   try {
     const { contact, reason, location } = req.body;
-
     if (!contact) {
       return res.json({ success: false, error: 'No emergency contact provided.' });
     }
 
-    const sosEmailUser = process.env.SOS_EMAIL_USER;
-    const sosEmailPass = process.env.SOS_EMAIL_PASS;
-
-    if (!sosEmailUser || !sosEmailPass) {
-      return res.json({ success: false, error: 'SOS email not configured on server.', notConfigured: true });
-    }
-
-    // Build the message
     let mapsLink = '';
     let locText = 'Location unavailable';
     if (location && location.lat && location.lng) {
@@ -620,61 +692,27 @@ app.post('/api/sos', async (req, res) => {
     }
 
     const subject = 'EMERGENCY SOS - VisionBridge Alert';
-    const htmlBody = `
-      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;border:3px solid #e74c3c;border-radius:12px;">
-        <h1 style="color:#e74c3c;text-align:center;">EMERGENCY SOS</h1>
-        <p style="font-size:18px;">A VisionBridge user has triggered an emergency alert and needs immediate help.</p>
-        <hr style="border:1px solid #eee;">
-        <p><strong>Reason:</strong> ${reason || 'Manual SOS activated'}</p>
-        <p><strong>Location:</strong> ${locText}</p>
-        ${mapsLink ? `<p><a href="${mapsLink}" style="display:inline-block;padding:12px 24px;background:#e74c3c;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;">Open in Google Maps</a></p>` : ''}
-        <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
-        <hr style="border:1px solid #eee;">
-        <p style="color:#888;font-size:12px;">This is an automated emergency alert from the VisionBridge assistive application.</p>
-      </div>
-    `;
-    const textBody = `EMERGENCY SOS - VisionBridge Alert\nReason: ${reason || 'Manual SOS activated'}\nLocation: ${locText}\n${mapsLink ? 'Google Maps: ' + mapsLink : ''}\nTime: ${new Date().toLocaleString()}`;
+    const htmlBody = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;border:3px solid #e74c3c;border-radius:12px;"><h1 style="color:#e74c3c;text-align:center;">\u{1F6A8} EMERGENCY SOS</h1><p style="font-size:18px;">A VisionBridge user needs immediate help.</p><hr style="border:1px solid #eee;"><p><strong>Reason:</strong> ${reason || 'Manual SOS'}</p><p><strong>Location:</strong> ${locText}</p>${mapsLink ? `<p><a href="${mapsLink}" style="display:inline-block;padding:12px 24px;background:#e74c3c;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;">\u{1F4CD} Open in Google Maps</a></p>` : ''}<p><strong>Time:</strong> ${new Date().toLocaleString()}</p><hr style="border:1px solid #eee;"><p style="color:#888;font-size:12px;">Automated alert from VisionBridge.</p></div>`;
+    const textBody = `EMERGENCY SOS\nReason: ${reason || 'Manual SOS'}\nLocation: ${locText}\n${mapsLink ? 'Maps: ' + mapsLink : ''}\nTime: ${new Date().toLocaleString()}`;
 
-    // Create transporter (Gmail SMTP)
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: sosEmailUser,
-        pass: sosEmailPass
-      }
-    });
-
-    // Determine if contact is email or phone
-    const isEmail = contact.includes('@');
-
-    if (isEmail) {
-      await transporter.sendMail({
-        from: `"VisionBridge SOS" <${sosEmailUser}>`,
-        to: contact,
-        subject: subject,
-        text: textBody,
-        html: htmlBody
-      });
-      console.log(`[SOS] Emergency email sent to ${contact}`);
-      return res.json({ success: true, method: 'email' });
-    } else {
-      // For phone numbers, send an SMS-style email to a carrier gateway
-      // OR use the email to notify anyway
-      // We send the email to the configured SOS_EMAIL_USER as a record, 
-      // and note the phone number in the body
-      await transporter.sendMail({
-        from: `"VisionBridge SOS" <${sosEmailUser}>`,
-        to: sosEmailUser,
-        subject: subject + ` (Contact: ${contact})`,
-        text: `Emergency contact phone: ${contact}\n\n${textBody}`,
-        html: `<p><strong>Emergency Contact Phone:</strong> ${contact}</p>${htmlBody}`
-      });
-      console.log(`[SOS] Emergency email sent (phone contact: ${contact})`);
-      return res.json({ success: true, method: 'email-with-phone' });
+    const transporter = getTransporter();
+    if (!transporter) {
+      return res.json({ success: false, error: 'Email not configured. Set SOS_EMAIL_USER and SOS_EMAIL_PASS in Render.', notConfigured: true });
     }
 
+    await transporter.sendMail({
+      from: `"VisionBridge SOS" <${process.env.SOS_EMAIL_USER}>`,
+      to: contact,
+      subject,
+      text: textBody,
+      html: htmlBody,
+      priority: 'high'
+    });
+
+    console.log(`[SOS] Emergency email sent to ${contact}`);
+    res.json({ success: true });
   } catch (err) {
-    console.error('[SOS] Failed to send:', err.message);
-    return res.json({ success: false, error: err.message });
+    console.error('[SOS] Failed:', err.message);
+    res.json({ success: false, error: err.message });
   }
 });

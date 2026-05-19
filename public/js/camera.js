@@ -1,4 +1,4 @@
-﻿/**
+/**
  * camera.js â€” Camera management module for VisionBridge
  * Handles camera initialization, frame capture, and lifecycle.
  * Prefers rear camera on mobile devices.
@@ -10,8 +10,8 @@ const CameraModule = (() => {
   const ctx = canvas.getContext('2d');
 
   // Smaller images = faster API calls = fewer timeouts
-  const MAX_DIM = 480;
-  const JPEG_QUALITY = 0.4;
+  const MAX_DIM = 384;
+  const JPEG_QUALITY = 0.35;
 
   async function startCamera() {
     try {

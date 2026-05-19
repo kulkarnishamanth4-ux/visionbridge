@@ -232,10 +232,10 @@ const Features = (() => {
     let onSOSCallback = null;
     let sosActive = false;
 
-    // Store contact type and value separately
     let contactType = localStorage.getItem('vb_sos_type') || 'email';
     let contactEmail = localStorage.getItem('vb_sos_email') || '';
     let contactPhone = localStorage.getItem('vb_sos_phone') || '';
+    let verified = localStorage.getItem('vb_sos_verified') === 'true';
 
     function init(callback) {
       onSOSCallback = callback;
@@ -245,9 +245,7 @@ const Features = (() => {
           if (!a) return;
           const delta = Math.abs(a.x - lastAccel.x) + Math.abs(a.y - lastAccel.y) + Math.abs(a.z - lastAccel.z);
           lastAccel = { x: a.x, y: a.y, z: a.z, time: Date.now() };
-          if (delta > 40) {
-            triggerSOS('Fall detected');
-          }
+          if (delta > 40) triggerSOS('Fall detected');
         };
         window.addEventListener('devicemotion', motionHandler);
       }
@@ -272,31 +270,22 @@ const Features = (() => {
       });
     }
 
-    function setContactType(type) {
-      contactType = type;
-      localStorage.setItem('vb_sos_type', type);
-    }
-    function setEmail(email) {
-      contactEmail = email;
-      localStorage.setItem('vb_sos_email', email);
-    }
-    function setPhone(phone) {
-      contactPhone = phone;
-      localStorage.setItem('vb_sos_phone', phone);
-    }
+    function setContactType(type) { contactType = type; localStorage.setItem('vb_sos_type', type); }
+    function setEmail(email) { contactEmail = email; localStorage.setItem('vb_sos_email', email); clearVerification(); }
+    function setPhone(phone) { contactPhone = phone; localStorage.setItem('vb_sos_phone', phone); clearVerification(); }
+    function setVerified(v) { verified = v; localStorage.setItem('vb_sos_verified', v ? 'true' : 'false'); }
+    function clearVerification() { verified = false; localStorage.setItem('vb_sos_verified', 'false'); }
 
     function getContactType() { return contactType; }
     function getEmail() { return contactEmail; }
     function getPhone() { return contactPhone; }
-    // Legacy compatibility
-    function getContact() {
-      return contactType === 'phone' ? contactPhone : contactEmail;
-    }
+    function isVerified() { return verified; }
+    function getContact() { return contactType === 'phone' ? contactPhone : contactEmail; }
 
     return {
       init, triggerSOS, getLocation,
-      setContactType, setEmail, setPhone,
-      getContactType, getEmail, getPhone, getContact
+      setContactType, setEmail, setPhone, setVerified, clearVerification,
+      getContactType, getEmail, getPhone, getContact, isVerified
     };
   })();
 
