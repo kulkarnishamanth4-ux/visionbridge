@@ -229,10 +229,13 @@ const Features = (() => {
   const EmergencySOS = (() => {
     let motionHandler = null;
     let lastAccel = { x: 0, y: 0, z: 0, time: 0 };
-    let shakeCount = 0;
     let onSOSCallback = null;
-    let sosContact = localStorage.getItem('vb_sos_contact') || '';
     let sosActive = false;
+
+    // Store contact type and value separately
+    let contactType = localStorage.getItem('vb_sos_type') || 'email';
+    let contactEmail = localStorage.getItem('vb_sos_email') || '';
+    let contactPhone = localStorage.getItem('vb_sos_phone') || '';
 
     function init(callback) {
       onSOSCallback = callback;
@@ -242,7 +245,6 @@ const Features = (() => {
           if (!a) return;
           const delta = Math.abs(a.x - lastAccel.x) + Math.abs(a.y - lastAccel.y) + Math.abs(a.z - lastAccel.z);
           lastAccel = { x: a.x, y: a.y, z: a.z, time: Date.now() };
-          // Detect fall: very large sudden acceleration
           if (delta > 40) {
             triggerSOS('Fall detected');
           }
@@ -257,7 +259,7 @@ const Features = (() => {
       Haptic.vibrate('sos');
       const location = getLocation();
       if (onSOSCallback) onSOSCallback(reason, location);
-      setTimeout(() => { sosActive = false; }, 10000); // Cooldown
+      setTimeout(() => { sosActive = false; }, 10000);
     }
 
     function getLocation() {
@@ -270,14 +272,32 @@ const Features = (() => {
       });
     }
 
-    function setContact(contact) {
-      sosContact = contact;
-      localStorage.setItem('vb_sos_contact', contact);
+    function setContactType(type) {
+      contactType = type;
+      localStorage.setItem('vb_sos_type', type);
+    }
+    function setEmail(email) {
+      contactEmail = email;
+      localStorage.setItem('vb_sos_email', email);
+    }
+    function setPhone(phone) {
+      contactPhone = phone;
+      localStorage.setItem('vb_sos_phone', phone);
     }
 
-    function getContact() { return sosContact; }
+    function getContactType() { return contactType; }
+    function getEmail() { return contactEmail; }
+    function getPhone() { return contactPhone; }
+    // Legacy compatibility
+    function getContact() {
+      return contactType === 'phone' ? contactPhone : contactEmail;
+    }
 
-    return { init, triggerSOS, setContact, getContact, getLocation };
+    return {
+      init, triggerSOS, getLocation,
+      setContactType, setEmail, setPhone,
+      getContactType, getEmail, getPhone, getContact
+    };
   })();
 
   // =============================================
@@ -418,35 +438,35 @@ const Features = (() => {
 
     async function init() {
       const el = document.getElementById('battery-indicator');
+      if (!el) return;
+
       try {
-        if (navigator.getBattery) {
-          battery = await navigator.getBattery();
+        if (!navigator.getBattery) {
+          el.textContent = '\uD83D\uDD0B N/A';
+          el.className = 'badge';
+          return;
+        }
 
-          // Validate: some desktop browsers return the API but with bogus/default values
-          // A real battery will have level as a finite number between 0 and 1
-          const realBattery = typeof battery.level === 'number'
-            && isFinite(battery.level)
-            && battery.level >= 0 && battery.level <= 1
-            // Desktop Chrome often returns level=1, charging=true even with no battery
-            // If we're on a non-mobile device with 100% + charging, it's likely fake
-            && !(battery.level === 1 && battery.charging && !isMobileDevice());
+        battery = await navigator.getBattery();
+        level = battery.level;
+        charging = battery.charging;
 
-          if (!realBattery) {
-            if (el) el.style.display = 'none';
-            return;
-          }
-
-          level = battery.level;
-          charging = battery.charging;
+        // On real mobile devices, the battery API gives accurate readings.
+        // On desktops/servers (like Render), it always returns level=1 charging=true.
+        // We show real data on mobile, "N/A" on desktop.
+        if (isMobileDevice()) {
           supported = true;
           battery.addEventListener('levelchange', () => { level = battery.level; update(); });
           battery.addEventListener('chargingchange', () => { charging = battery.charging; update(); });
           update();
         } else {
-          if (el) el.style.display = 'none';
+          // Desktop / Render — no real battery, show N/A
+          el.textContent = '\uD83D\uDD0B N/A';
+          el.className = 'badge';
         }
       } catch {
-        if (el) el.style.display = 'none';
+        el.textContent = '\uD83D\uDD0B N/A';
+        el.className = 'badge';
       }
     }
 

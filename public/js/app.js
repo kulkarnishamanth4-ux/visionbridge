@@ -47,11 +47,38 @@
     });
   }
 
-  // Load SOS contact
-  const sosInput = document.getElementById('sos-contact');
-  if (sosInput) {
-    sosInput.value = F.EmergencySOS.getContact();
-    sosInput.addEventListener('change', (e) => F.EmergencySOS.setContact(e.target.value));
+  // Load SOS contact settings
+  const sosTypeSelect = document.getElementById('sos-type');
+  const sosEmailInput = document.getElementById('sos-contact-email');
+  const sosPhoneInput = document.getElementById('sos-contact-phone');
+  const sosEmailGroup = document.getElementById('sos-email-group');
+  const sosPhoneGroup = document.getElementById('sos-phone-group');
+
+  if (sosTypeSelect) {
+    sosTypeSelect.value = F.EmergencySOS.getContactType();
+    // Show/hide the correct field on load
+    if (F.EmergencySOS.getContactType() === 'phone') {
+      if (sosEmailGroup) sosEmailGroup.classList.add('hidden');
+      if (sosPhoneGroup) sosPhoneGroup.classList.remove('hidden');
+    }
+    sosTypeSelect.addEventListener('change', (e) => {
+      F.EmergencySOS.setContactType(e.target.value);
+      if (e.target.value === 'phone') {
+        if (sosEmailGroup) sosEmailGroup.classList.add('hidden');
+        if (sosPhoneGroup) sosPhoneGroup.classList.remove('hidden');
+      } else {
+        if (sosEmailGroup) sosEmailGroup.classList.remove('hidden');
+        if (sosPhoneGroup) sosPhoneGroup.classList.add('hidden');
+      }
+    });
+  }
+  if (sosEmailInput) {
+    sosEmailInput.value = F.EmergencySOS.getEmail();
+    sosEmailInput.addEventListener('change', (e) => F.EmergencySOS.setEmail(e.target.value));
+  }
+  if (sosPhoneInput) {
+    sosPhoneInput.value = F.EmergencySOS.getPhone();
+    sosPhoneInput.addEventListener('change', (e) => F.EmergencySOS.setPhone(e.target.value));
   }
 
   // --- Mode Descriptions ---
@@ -113,23 +140,36 @@
     F.Haptic.vibrate('sos');
     SpeechModule.speak('Emergency SOS activated! ' + reason, SpeechModule.PRIORITY.DANGER);
 
+    const contactType = F.EmergencySOS.getContactType();
     const contact = F.EmergencySOS.getContact();
 
     const processLocation = async (loc) => {
       let locText = 'Location unavailable';
+      let mapsLink = '';
       if (loc) {
-        locText = `Location: ${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}`;
+        locText = `Lat: ${loc.lat.toFixed(5)}, Lng: ${loc.lng.toFixed(5)}`;
+        mapsLink = `https://maps.google.com/?q=${loc.lat},${loc.lng}`;
       }
       locEl.textContent = locText;
 
       if (!contact) {
-        SpeechModule.speak('Please configure an emergency contact in settings.', SpeechModule.PRIORITY.INFO);
+        SpeechModule.speak('No emergency contact configured. Please go to settings and add a phone number or email.', SpeechModule.PRIORITY.DANGER);
+        locEl.textContent = locText + ' \u2014 No contact configured!';
         return;
       }
 
-      // Send SOS via server backend
+      // ---- PHONE: Instantly place a call ----
+      if (contactType === 'phone') {
+        locEl.textContent = locText + ' \u2014 Calling ' + contact + '...';
+        SpeechModule.speak('Calling your emergency contact now.', SpeechModule.PRIORITY.DANGER);
+        // tel: link triggers the phone dialer immediately on mobile — zero prompts
+        window.location.href = 'tel:' + encodeURIComponent(contact);
+        return;
+      }
+
+      // ---- EMAIL: Send via server (automated, no user action) ----
       try {
-        locEl.textContent = locText + ' — Sending SOS...';
+        locEl.textContent = locText + ' \u2014 Sending SOS email...';
         const response = await fetch('/api/sos', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -142,24 +182,18 @@
         const result = await response.json();
 
         if (result.success) {
-          locEl.textContent = locText + ' — SOS sent!';
-          SpeechModule.speak('SOS message sent successfully to your emergency contact!', SpeechModule.PRIORITY.DANGER);
+          locEl.textContent = locText + ' \u2014 SOS email sent!';
+          SpeechModule.speak('SOS email sent successfully to ' + contact, SpeechModule.PRIORITY.DANGER);
         } else if (result.notConfigured) {
-          // Server doesn't have email configured — fallback to native share
-          locEl.textContent = locText + ' — Using device share...';
-          const mapsLink = loc ? `https://maps.google.com/?q=${loc.lat},${loc.lng}` : '';
-          const message = `EMERGENCY SOS: VisionBridge user needs help! Reason: ${reason}. ${mapsLink ? 'Location: ' + mapsLink : locText}`;
-          if (navigator.share) {
-            await navigator.share({ title: 'Emergency SOS', text: message }).catch(() => {});
-          }
-          SpeechModule.speak('SOS email is not configured on the server. Please ask your administrator to set it up.', SpeechModule.PRIORITY.INFO);
+          locEl.textContent = locText + ' \u2014 Email not configured on server';
+          SpeechModule.speak('SOS email is not configured on the server. Please set SOS email credentials in the server environment.', SpeechModule.PRIORITY.DANGER);
         } else {
-          locEl.textContent = locText + ' — SOS failed: ' + (result.error || 'Unknown error');
-          SpeechModule.speak('Failed to send SOS. ' + (result.error || ''), SpeechModule.PRIORITY.DANGER);
+          locEl.textContent = locText + ' \u2014 Failed: ' + (result.error || 'Unknown error');
+          SpeechModule.speak('Failed to send SOS email. ' + (result.error || ''), SpeechModule.PRIORITY.DANGER);
         }
-      } catch (err) {
-        locEl.textContent = locText + ' — Network error';
-        SpeechModule.speak('Could not reach the server to send SOS.', SpeechModule.PRIORITY.DANGER);
+      } catch {
+        locEl.textContent = locText + ' \u2014 Network error';
+        SpeechModule.speak('Could not reach the server to send SOS email.', SpeechModule.PRIORITY.DANGER);
       }
     };
 

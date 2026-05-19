@@ -554,6 +554,46 @@ app.listen(PORT, '0.0.0.0', () => {
 });
 
 // =============================================
+//   TRANSLATION ENDPOINT (for multi-language TTS)
+// =============================================
+app.post('/api/translate', async (req, res) => {
+  try {
+    const { text, targetLang } = req.body;
+    if (!text || !targetLang || targetLang === 'en') {
+      return res.json({ translated: text });
+    }
+
+    const client = getGenAI();
+    if (!client) {
+      return res.json({ translated: text });
+    }
+
+    const langNames = {
+      hi: 'Hindi', kn: 'Kannada', ta: 'Tamil', te: 'Telugu',
+      mr: 'Marathi', bn: 'Bengali', gu: 'Gujarati', ml: 'Malayalam',
+      pa: 'Punjabi', ur: 'Urdu', es: 'Spanish', fr: 'French',
+      de: 'German', ja: 'Japanese', ko: 'Korean', zh: 'Chinese',
+      ar: 'Arabic', pt: 'Portuguese', ru: 'Russian', it: 'Italian'
+    };
+    const langName = langNames[targetLang] || targetLang;
+
+    const response = await callWithFallback(client, {
+      contents: [{
+        role: 'user',
+        parts: [{ text: `Translate the following English text to ${langName}. Return ONLY the translated text, nothing else.\n\n${text}` }]
+      }],
+      config: { maxOutputTokens: 512 }
+    });
+
+    const translated = response?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || text;
+    res.json({ translated });
+  } catch (err) {
+    console.warn('[Translate] Error:', err.message?.slice(0, 80));
+    res.json({ translated: req.body.text || '' });
+  }
+});
+
+// =============================================
 //   SOS EMERGENCY EMAIL ENDPOINT
 // =============================================
 app.post('/api/sos', async (req, res) => {

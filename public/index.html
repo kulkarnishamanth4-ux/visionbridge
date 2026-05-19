@@ -221,8 +221,19 @@
           <input type="text" id="wake-word-input" value="hey vision">
         </div>
         <div class="setting-group">
-          <label for="sos-contact">Emergency contact (phone/email)</label>
-          <input type="text" id="sos-contact" placeholder="Enter phone or email" value="">
+          <label for="sos-type">Emergency contact type</label>
+          <select id="sos-type" aria-label="Select contact type">
+            <option value="email">Email address</option>
+            <option value="phone">Phone number (will place a call)</option>
+          </select>
+        </div>
+        <div class="setting-group" id="sos-email-group">
+          <label for="sos-contact-email">Emergency email address</label>
+          <input type="email" id="sos-contact-email" placeholder="example@gmail.com" value="">
+        </div>
+        <div class="setting-group hidden" id="sos-phone-group">
+          <label for="sos-contact-phone">Emergency phone number</label>
+          <input type="tel" id="sos-contact-phone" placeholder="+91 98765 43210" value="">
         </div>
         <div class="setting-group toggle-group">
           <label for="camera-preview-toggle">Show camera preview</label>
