@@ -334,8 +334,8 @@ app.post('/api/analyze', async (req, res) => {
       ],
       config: {
         systemInstruction,
-        temperature: 0.3,
-        maxOutputTokens: mode === 'summary' ? 256 : 2048
+        temperature: 0.2,
+        maxOutputTokens: mode === 'summary' ? 256 : mode === 'danger' ? 512 : 768
       }
     };
 
@@ -407,7 +407,7 @@ app.post('/api/measure', async (req, res) => {
 
     const requestConfig = {
       contents: [{ role: 'user', parts }],
-      config: { systemInstruction: instruction, temperature: 0.3, maxOutputTokens: 1024 }
+      config: { systemInstruction: instruction, temperature: 0.2, maxOutputTokens: 512 }
     };
 
     const response = await callWithFallback(client, requestConfig);
@@ -459,8 +459,8 @@ app.post('/api/ask', async (req, res) => {
       ],
       config: {
         systemInstruction: QA_SYSTEM_INSTRUCTION,
-        temperature: 0.5,
-        maxOutputTokens: 512
+        temperature: 0.4,
+        maxOutputTokens: 256
       }
     };
 
@@ -580,12 +580,12 @@ app.post('/api/translate', async (req, res) => {
     const response = await callWithFallback(client, {
       contents: [{
         role: 'user',
-        parts: [{ text: `Translate the following English text to ${langName}. Return ONLY the translated text, nothing else.\n\n${text}` }]
+        parts: [{ text: `Translate the following English text to ${langName}. Return ONLY the translated text, nothing else. Do not include any quotes or formatting.\n\n${text}` }]
       }],
-      config: { maxOutputTokens: 512 }
+      config: { maxOutputTokens: 256, temperature: 0.2 }
     });
 
-    const translated = response?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || text;
+    const translated = response.text.trim() || text;
     res.json({ translated });
   } catch (err) {
     console.warn('[Translate] Error:', err.message?.slice(0, 80));

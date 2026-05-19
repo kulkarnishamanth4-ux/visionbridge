@@ -162,38 +162,59 @@
       if (contactType === 'phone') {
         locEl.textContent = locText + ' \u2014 Calling ' + contact + '...';
         SpeechModule.speak('Calling your emergency contact now.', SpeechModule.PRIORITY.DANGER);
-        // tel: link triggers the phone dialer immediately on mobile — zero prompts
         window.location.href = 'tel:' + encodeURIComponent(contact);
         return;
       }
 
-      // ---- EMAIL: Send via server (automated, no user action) ----
+      // ---- EMAIL: Send directly via formsubmit.co (no server config needed) ----
+      locEl.textContent = locText + ' \u2014 Sending SOS email...';
+      const messageBody = `EMERGENCY SOS - VisionBridge Alert\n\nA VisionBridge user needs immediate help.\n\nReason: ${reason}\nLocation: ${locText}\n${mapsLink ? 'Google Maps: ' + mapsLink : ''}\nTime: ${new Date().toLocaleString()}\n\nThis is an automated emergency alert from VisionBridge.`;
+
       try {
-        locEl.textContent = locText + ' \u2014 Sending SOS email...';
+        // Try formsubmit.co first (works without any server config)
+        const formRes = await fetch('https://formsubmit.co/ajax/' + encodeURIComponent(contact), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({
+            _subject: 'EMERGENCY SOS - VisionBridge Alert',
+            reason: reason,
+            location: locText,
+            maps_link: mapsLink || 'Not available',
+            time: new Date().toLocaleString(),
+            message: messageBody
+          })
+        });
+        const formData = await formRes.json();
+
+        if (formData.success === 'true' || formData.success === true) {
+          locEl.textContent = locText + ' \u2014 SOS email sent!';
+          SpeechModule.speak('SOS email sent successfully to ' + contact, SpeechModule.PRIORITY.DANGER);
+          return;
+        }
+      } catch { /* formsubmit failed, try server fallback */ }
+
+      // Fallback: try server-side Nodemailer
+      try {
         const response = await fetch('/api/sos', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contact: contact,
-            reason: reason,
-            location: loc ? { lat: loc.lat, lng: loc.lng } : null
-          })
+          body: JSON.stringify({ contact, reason, location: loc ? { lat: loc.lat, lng: loc.lng } : null })
         });
         const result = await response.json();
-
         if (result.success) {
           locEl.textContent = locText + ' \u2014 SOS email sent!';
-          SpeechModule.speak('SOS email sent successfully to ' + contact, SpeechModule.PRIORITY.DANGER);
-        } else if (result.notConfigured) {
-          locEl.textContent = locText + ' \u2014 Email not configured on server';
-          SpeechModule.speak('SOS email is not configured on the server. Please set SOS email credentials in the server environment.', SpeechModule.PRIORITY.DANGER);
-        } else {
-          locEl.textContent = locText + ' \u2014 Failed: ' + (result.error || 'Unknown error');
-          SpeechModule.speak('Failed to send SOS email. ' + (result.error || ''), SpeechModule.PRIORITY.DANGER);
+          SpeechModule.speak('SOS email sent to ' + contact, SpeechModule.PRIORITY.DANGER);
+          return;
         }
-      } catch {
-        locEl.textContent = locText + ' \u2014 Network error';
-        SpeechModule.speak('Could not reach the server to send SOS email.', SpeechModule.PRIORITY.DANGER);
+      } catch { /* server also failed */ }
+
+      // Last resort: native share
+      locEl.textContent = locText + ' \u2014 Opening share...';
+      SpeechModule.speak('Opening share to send your SOS message.', SpeechModule.PRIORITY.DANGER);
+      if (navigator.share) {
+        await navigator.share({ title: 'EMERGENCY SOS', text: messageBody }).catch(() => {});
+      } else {
+        window.open('mailto:' + contact + '?subject=EMERGENCY SOS&body=' + encodeURIComponent(messageBody), '_blank');
       }
     };
 

@@ -443,44 +443,35 @@ const Features = (() => {
       try {
         if (!navigator.getBattery) {
           el.textContent = '\uD83D\uDD0B N/A';
-          el.className = 'badge';
+          el.className = 'badge badge-ok';
           return;
         }
 
         battery = await navigator.getBattery();
         level = battery.level;
         charging = battery.charging;
+        supported = true;
 
-        // On real mobile devices, the battery API gives accurate readings.
-        // On desktops/servers (like Render), it always returns level=1 charging=true.
-        // We show real data on mobile, "N/A" on desktop.
-        if (isMobileDevice()) {
-          supported = true;
-          battery.addEventListener('levelchange', () => { level = battery.level; update(); });
-          battery.addEventListener('chargingchange', () => { charging = battery.charging; update(); });
-          update();
-        } else {
-          // Desktop / Render — no real battery, show N/A
-          el.textContent = '\uD83D\uDD0B N/A';
-          el.className = 'badge';
-        }
+        battery.addEventListener('levelchange', () => { level = battery.level; update(); });
+        battery.addEventListener('chargingchange', () => { charging = battery.charging; update(); });
+        update();
       } catch {
         el.textContent = '\uD83D\uDD0B N/A';
-        el.className = 'badge';
+        el.className = 'badge badge-ok';
       }
-    }
-
-    function isMobileDevice() {
-      return /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-        || ('ontouchstart' in window && navigator.maxTouchPoints > 1);
     }
 
     function update() {
       const el = document.getElementById('battery-indicator');
       if (!el || !supported) return;
       const pct = Math.round(level * 100);
-      el.textContent = charging ? '\u26A1' + pct + '%' : '\uD83D\uDD0B' + pct + '%';
-      el.className = 'badge ' + (pct < 20 ? 'badge-danger' : pct < 50 ? 'badge-warn' : 'badge-ok');
+      if (charging) {
+        el.textContent = '\u26A1 ' + pct + '%';
+        el.className = 'badge badge-ok';
+      } else {
+        el.textContent = '\uD83D\uDD0B ' + pct + '%';
+        el.className = 'badge ' + (pct < 20 ? 'badge-danger' : pct < 50 ? 'badge-warn' : 'badge-ok');
+      }
     }
 
     function getRecommendedInterval(baseMs) {

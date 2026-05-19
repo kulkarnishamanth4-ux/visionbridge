@@ -16,7 +16,7 @@ const ApiModule = (() => {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 20000); // 20s timeout
+        const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
         const res = await fetch(url, { ...options, signal: controller.signal });
         clearTimeout(timeout);

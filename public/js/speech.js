@@ -257,6 +257,10 @@ const SpeechModule = (() => {
     const utterance = new SpeechSynthesisUtterance(item.text);
 
     if (selectedVoice) utterance.voice = selectedVoice;
+    // Set lang explicitly — critical for non-English speech
+    if (currentLang && currentLang !== 'en') {
+      utterance.lang = selectedVoice ? selectedVoice.lang : currentLang;
+    }
     utterance.rate = speechRate;
     utterance.pitch = item.priority === PRIORITY.DANGER ? 1.2 : 1.0;
     utterance.volume = 1.0;
@@ -312,20 +316,34 @@ const SpeechModule = (() => {
     translateCache.clear();
     const allVoices = synth.getVoices();
 
-    // Find all voices for this language
-    const candidates = allVoices.filter(v => v.lang.startsWith(langCode));
+    // Map short codes to full locale codes for better voice matching
+    const localeMap = {
+      en: 'en', hi: 'hi', kn: 'kn', ta: 'ta', te: 'te',
+      mr: 'mr', bn: 'bn', gu: 'gu', ml: 'ml', pa: 'pa', ur: 'ur',
+      es: 'es', fr: 'fr', de: 'de', ja: 'ja', ko: 'ko',
+      zh: 'zh', ar: 'ar', pt: 'pt', ru: 'ru', it: 'it'
+    };
+
+    // Find voices matching the language (check both 'hi' and 'hi-IN' formats)
+    const candidates = allVoices.filter(v => {
+      const vLang = v.lang.toLowerCase();
+      return vLang === langCode
+        || vLang.startsWith(langCode + '-')
+        || vLang.startsWith(langCode + '_');
+    });
 
     if (candidates.length > 0) {
-      // Prefer higher-quality voices: Google > Natural > Enhanced > Online > default
+      // Rank by quality: Google > Natural > Enhanced > Premium > Remote > Local
       const ranked = candidates.sort((a, b) => {
         const score = (v) => {
           const n = v.name.toLowerCase();
-          if (n.includes('google')) return 5;
-          if (n.includes('natural')) return 4;
-          if (n.includes('enhanced')) return 3;
-          if (n.includes('premium')) return 3;
+          if (n.includes('google')) return 6;
+          if (n.includes('natural')) return 5;
+          if (n.includes('enhanced')) return 4;
+          if (n.includes('premium')) return 4;
+          if (n.includes('wavenet')) return 3;
           if (n.includes('online')) return 2;
-          if (!v.localService) return 1; // Remote voices are usually better
+          if (!v.localService) return 1; // Remote voices are usually higher quality
           return 0;
         };
         return score(b) - score(a);
@@ -334,14 +352,18 @@ const SpeechModule = (() => {
       console.log('[Speech] Language set to:', selectedVoice.lang, selectedVoice.name,
         `(${candidates.length} voices available, picked best quality)`);
     } else {
-      console.warn('[Speech] No voice for:', langCode, '- will still translate text');
+      // No voice found for this language — clear selectedVoice
+      // The utterance.lang will be set directly so the browser can still try
+      selectedVoice = null;
+      console.warn('[Speech] No voice for:', langCode, '- setting utterance.lang directly');
     }
 
-    // Slow down for Indian languages where TTS clarity is typically lower
-    const slowLangs = ['kn', 'hi', 'ta', 'te', 'mr', 'bn', 'gu', 'ml'];
-    if (slowLangs.includes(langCode)) {
-      speechRate = Math.min(speechRate, 0.85);
-      console.log('[Speech] Rate reduced to', speechRate, 'for clarity');
+    // Adjust rate for naturalness per language
+    if (langCode === 'en') {
+      speechRate = 1.0;
+    } else {
+      // Slightly slower for non-English for clarity
+      speechRate = 0.9;
     }
   }
 
