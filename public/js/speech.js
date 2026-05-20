@@ -231,22 +231,27 @@ const SpeechModule = (() => {
     const cacheKey = `${lang}:${text}`;
     if (translateCache.has(cacheKey)) return translateCache.get(cacheKey);
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000); // 5s max
       const res = await fetch('/api/translate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, targetLang: lang })
+        body: JSON.stringify({ text, targetLang: lang }),
+        signal: controller.signal
       });
+      clearTimeout(timeout);
       const data = await res.json();
       const translated = data.translated || text;
+      console.log(`[Speech] Translated to ${lang}: "${translated.slice(0, 50)}..."`);
       translateCache.set(cacheKey, translated);
-      // Keep cache size under control
       if (translateCache.size > 200) {
         const first = translateCache.keys().next().value;
         translateCache.delete(first);
       }
       return translated;
-    } catch {
-      return text; // fallback to original on error
+    } catch (e) {
+      console.warn('[Speech] Translation failed:', e.message || 'timeout');
+      return text;
     }
   }
 
@@ -254,10 +259,22 @@ const SpeechModule = (() => {
     if (isSpeaking || speechQueue.length === 0) return;
 
     const item = speechQueue.shift();
+    
+    // Split long text into sentences to avoid Chrome's ~15s speech limit
+    if (item.text.length > 200) {
+      const sentences = item.text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [item.text];
+      // Push sentences back in reverse order so first sentence is processed first
+      for (let i = sentences.length - 1; i >= 0; i--) {
+        const s = sentences[i].trim();
+        if (s) speechQueue.unshift({ text: s, priority: item.priority });
+      }
+      processQueue();
+      return;
+    }
+
     const utterance = new SpeechSynthesisUtterance(item.text);
 
     if (selectedVoice) utterance.voice = selectedVoice;
-    // Set lang explicitly — critical for non-English speech
     if (currentLang && currentLang !== 'en') {
       utterance.lang = selectedVoice ? selectedVoice.lang : currentLang;
     }
@@ -265,26 +282,42 @@ const SpeechModule = (() => {
     utterance.pitch = item.priority === PRIORITY.DANGER ? 1.2 : 1.0;
     utterance.volume = 1.0;
 
+    // Watchdog: if Chrome silently kills speech, force-reset after timeout
+    let watchdog = null;
+
     utterance.onstart = () => {
       isSpeaking = true;
       currentUtterance = utterance;
       if (onSpeakStartCallback) onSpeakStartCallback();
 
-      // Chrome workaround: Chrome pauses synth after ~15s.
-      // Periodically call pause/resume to keep it alive.
+      // Chrome workaround: pause/resume to keep alive
       clearInterval(chromeResumeInterval);
       chromeResumeInterval = setInterval(() => {
         if (synth.speaking && !synth.paused) {
           synth.pause();
           synth.resume();
         }
-      }, 10000);
+      }, 8000);
+
+      // Watchdog: if speech hasn't ended in 20s, force-continue
+      clearTimeout(watchdog);
+      watchdog = setTimeout(() => {
+        if (isSpeaking) {
+          console.warn('[Speech] Watchdog: speech stuck, force-resetting');
+          synth.cancel();
+          isSpeaking = false;
+          currentUtterance = null;
+          clearInterval(chromeResumeInterval);
+          processQueue();
+        }
+      }, 20000);
     };
 
     utterance.onend = () => {
       isSpeaking = false;
       currentUtterance = null;
       clearInterval(chromeResumeInterval);
+      clearTimeout(watchdog);
       if (onSpeakEndCallback) onSpeakEndCallback();
       processQueue();
     };
@@ -294,6 +327,7 @@ const SpeechModule = (() => {
       isSpeaking = false;
       currentUtterance = null;
       clearInterval(chromeResumeInterval);
+      clearTimeout(watchdog);
       processQueue();
     };
 

@@ -554,6 +554,8 @@ app.listen(PORT, '0.0.0.0', () => {
 
 // =============================================
 //   TRANSLATION ENDPOINT (for multi-language TTS)
+//   Uses a FAST single-model call — no retries, no fallback chain.
+//   Translation must be instant for TTS to work smoothly.
 // =============================================
 app.post('/api/translate', async (req, res) => {
   try {
@@ -576,15 +578,19 @@ app.post('/api/translate', async (req, res) => {
     };
     const langName = langNames[targetLang] || targetLang;
 
-    const response = await callWithFallback(client, {
+    // Direct single-model call — NO retries, NO fallback chain.
+    // Translation must be fast for TTS to feel instant.
+    const response = await client.models.generateContent({
+      model: 'gemini-2.0-flash',
       contents: [{
         role: 'user',
-        parts: [{ text: `Translate the following English text to ${langName}. Return ONLY the translated text, nothing else. Do not include any quotes or formatting.\n\n${text}` }]
+        parts: [{ text: `Translate the following text to ${langName}. Output ONLY the translation, no explanation, no quotes, no formatting.\n\n${text}` }]
       }],
-      config: { maxOutputTokens: 256, temperature: 0.2 }
+      config: { maxOutputTokens: 256, temperature: 0.1 }
     });
 
     const translated = response.text.trim() || text;
+    console.log(`[Translate] ${targetLang}: "${text.slice(0, 40)}..." -> "${translated.slice(0, 40)}..."`);
     res.json({ translated });
   } catch (err) {
     console.warn('[Translate] Error:', err.message?.slice(0, 80));

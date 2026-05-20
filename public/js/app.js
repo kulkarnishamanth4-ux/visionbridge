@@ -281,11 +281,18 @@
         return;
       }
 
-      // ---- PHONE: Instantly place a call (zero interaction) ----
+      // ---- PHONE: Place a call using anchor click (more reliable auto-dial) ----
       if (contactType === 'phone') {
         locEl.textContent = locText + ' \u2014 Calling ' + contact + '...';
         SpeechModule.speak('Calling your emergency contact now.', SpeechModule.PRIORITY.DANGER);
-        window.location.href = 'tel:' + encodeURIComponent(contact);
+        // Create a hidden anchor and click it — this triggers the system call intent
+        // more reliably than window.location.href on Android Chrome
+        const callLink = document.createElement('a');
+        callLink.href = 'tel:' + contact.replace(/\s/g, '');
+        callLink.style.display = 'none';
+        document.body.appendChild(callLink);
+        callLink.click();
+        setTimeout(() => callLink.remove(), 1000);
         return;
       }
 
