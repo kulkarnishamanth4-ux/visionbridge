@@ -215,13 +215,9 @@ const SpeechModule = (() => {
       currentUtterance = null;
     }
 
-    // Auto-translate if non-English language is selected
-    let finalText = text;
-    if (currentLang && currentLang !== 'en' && text && text.length > 1) {
-      finalText = await translateText(text, currentLang);
-    }
-
-    speechQueue.push({ text: finalText, priority });
+    // Text is already in the target language (Gemini generates it directly).
+    // No separate translation call needed.
+    speechQueue.push({ text, priority });
     speechQueue.sort((a, b) => b.priority - a.priority);
 
     processQueue();
@@ -418,6 +414,7 @@ const SpeechModule = (() => {
     unlockAudio, playDangerBeep,
     setWakeWord, setVoice, setRate, setLanguage,
     onWakeWord, onTranscript, onSpeakStart, onSpeakEnd,
+    getLanguage() { return currentLang; },
     get isListening() { return isListening; },
     get isSpeaking() { return isSpeaking; },
     get isSupported() { return recognitionSupported; },

@@ -637,7 +637,7 @@
         const frame = CameraModule.captureFrame();
         if (frame) {
           geminiResult = await Promise.race([
-            ApiModule.analyzeScene(frame, currentMode),
+            ApiModule.analyzeScene(frame, currentMode, SpeechModule.getLanguage()),
             new Promise(r => setTimeout(() => r(null), 10000))
           ]);
           P.recordAPI(!!geminiResult && !geminiResult._cached);
@@ -843,7 +843,7 @@
       const frame = CameraModule.captureFrame();
       if (!frame) return;
       const result = await Promise.race([
-        ApiModule.analyzeScene(frame, currentMode),
+        ApiModule.analyzeScene(frame, currentMode, SpeechModule.getLanguage()),
         new Promise(r => setTimeout(() => r(null), 8000))
       ]);
       P.recordAPI(!!result && !result._cached);

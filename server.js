@@ -306,7 +306,7 @@ app.post('/api/analyze', async (req, res) => {
       });
     }
 
-    const { image, mode = 'detailed' } = req.body;
+    const { image, mode = 'detailed', lang = 'en' } = req.body;
     if (!image) {
       return res.status(400).json({ error: 'No image provided' });
     }
@@ -314,11 +314,23 @@ app.post('/api/analyze', async (req, res) => {
     const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
     const systemInstruction = MODE_INSTRUCTIONS[mode] || DETAILED_INSTRUCTION;
 
+    // Language names for prompt injection
+    const langNames = {
+      hi: 'Hindi', kn: 'Kannada', ta: 'Tamil', te: 'Telugu',
+      mr: 'Marathi', bn: 'Bengali', gu: 'Gujarati', ml: 'Malayalam',
+      pa: 'Punjabi', ur: 'Urdu', es: 'Spanish', fr: 'French',
+      de: 'German', ja: 'Japanese', ko: 'Korean', zh: 'Chinese',
+      ar: 'Arabic', pt: 'Portuguese', ru: 'Russian', it: 'Italian'
+    };
+    const langSuffix = (lang && lang !== 'en' && langNames[lang])
+      ? ` IMPORTANT: Write ALL text values (description, summary, danger descriptions) in ${langNames[lang]} language. The JSON keys must stay in English but all text content must be in ${langNames[lang]}.`
+      : '';
+
     const promptTexts = {
-      detailed: 'Analyze this scene for a blind person. Describe the surroundings in detail and identify any immediate dangers. Respond in the required JSON format.',
-      danger: 'DANGER SCAN: Only report close-range, immediate dangers. If none, say the path is clear. Respond in JSON.',
-      summary: 'Summarize this entire scene in ONE sentence. Respond in JSON.',
-      measure: 'Estimate the size, distance, and movement speed of all visible objects. Respond in JSON.'
+      detailed: 'Analyze this scene for a blind person. Describe the surroundings in detail and identify any immediate dangers. Respond in the required JSON format.' + langSuffix,
+      danger: 'DANGER SCAN: Only report close-range, immediate dangers. If none, say the path is clear. Respond in JSON.' + langSuffix,
+      summary: 'Summarize this entire scene in ONE sentence. Respond in JSON.' + langSuffix,
+      measure: 'Estimate the size, distance, and movement speed of all visible objects. Respond in JSON.' + langSuffix
     };
 
     const requestConfig = {
@@ -604,9 +616,47 @@ app.post('/api/translate', async (req, res) => {
 function getTransporter() {
   const user = process.env.SOS_EMAIL_USER;
   const pass = process.env.SOS_EMAIL_PASS;
-  if (!user || !pass) return null;
-  return nodemailer.createTransport({ service: 'gmail', auth: { user, pass } });
+  if (!user || !pass) {
+    console.warn('[SMTP] SOS_EMAIL_USER or SOS_EMAIL_PASS not set!');
+    return null;
+  }
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user, pass },
+    tls: { rejectUnauthorized: false }
+  });
 }
+
+// =============================================
+//   EMAIL DIAGNOSTIC ENDPOINT
+// =============================================
+app.get('/api/test-email', async (req, res) => {
+  const user = process.env.SOS_EMAIL_USER;
+  const pass = process.env.SOS_EMAIL_PASS;
+  if (!user || !pass) {
+    return res.json({
+      success: false,
+      error: 'SOS_EMAIL_USER or SOS_EMAIL_PASS environment variable is not set.',
+      SOS_EMAIL_USER_set: !!user,
+      SOS_EMAIL_PASS_set: !!pass
+    });
+  }
+  try {
+    const transporter = getTransporter();
+    await transporter.verify();
+    return res.json({
+      success: true,
+      message: 'SMTP connection verified! Email sending will work.',
+      email: user
+    });
+  } catch (err) {
+    return res.json({
+      success: false,
+      error: 'SMTP connection failed: ' + err.message,
+      hint: 'Make sure you are using a Gmail App Password (not your regular password). Get one at https://myaccount.google.com/apppasswords'
+    });
+  }
+});
 
 // =============================================
 //   OTP VERIFICATION ENDPOINTS

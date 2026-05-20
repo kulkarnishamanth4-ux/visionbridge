@@ -56,14 +56,13 @@ const ApiModule = (() => {
     }
   }
 
-  async function analyzeScene(base64Image, mode = 'detailed') {
+  async function analyzeScene(base64Image, mode = 'detailed', lang = 'en') {
     const data = await fetchWithRetry(`${BASE}/api/analyze`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: base64Image, mode })
+      body: JSON.stringify({ image: base64Image, mode, lang })
     });
 
-    // Ensure we always return a valid result shape
     return {
       description: data.description || '',
       dangers: data.dangers || [],
