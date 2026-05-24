@@ -256,9 +256,9 @@ const SpeechModule = (() => {
 
     const item = speechQueue.shift();
     
-    // Split long text into sentences to avoid Chrome's ~15s speech limit
-    if (item.text.length > 200) {
-      const sentences = item.text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [item.text];
+    // Split text into short sentences — Chrome kills speech after ~15s
+    if (item.text.length > 120) {
+      const sentences = item.text.match(/[^.!?,;:]+[.!?,;:]+|[^.!?,;:]+$/g) || [item.text];
       // Push sentences back in reverse order so first sentence is processed first
       for (let i = sentences.length - 1; i >= 0; i--) {
         const s = sentences[i].trim();
@@ -293,7 +293,7 @@ const SpeechModule = (() => {
           synth.pause();
           synth.resume();
         }
-      }, 8000);
+      }, 5000);
 
       // Watchdog: if speech hasn't ended in 20s, force-continue
       clearTimeout(watchdog);
@@ -306,7 +306,7 @@ const SpeechModule = (() => {
           clearInterval(chromeResumeInterval);
           processQueue();
         }
-      }, 20000);
+      }, 12000);
     };
 
     utterance.onend = () => {

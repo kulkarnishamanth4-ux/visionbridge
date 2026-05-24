@@ -26,7 +26,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 let genAI = null;
 
 function getGenAI() {
-  if (!genAI && process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_api_key_here') {
+  if (!genAI && process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'AIzaSyDW3aH39x4UT58dLI3YSYBrGmJlcM6oO2E') {
     genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   }
   return genAI;
@@ -85,13 +85,13 @@ function extractJSON(text) {
   let cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
 
   // Try direct parse first
-  try { return JSON.parse(cleaned); } catch {}
+  try { return JSON.parse(cleaned); } catch { }
 
   // Find first { ... } block (greedy)
   const start = cleaned.indexOf('{');
   const end = cleaned.lastIndexOf('}');
   if (start !== -1 && end > start) {
-    try { return JSON.parse(cleaned.slice(start, end + 1)); } catch {}
+    try { return JSON.parse(cleaned.slice(start, end + 1)); } catch { }
   }
 
   // Handle TRUNCATED JSON: try to extract known fields via regex
@@ -346,7 +346,7 @@ app.post('/api/analyze', async (req, res) => {
       config: {
         systemInstruction,
         temperature: 0.2,
-        maxOutputTokens: mode === 'summary' ? 256 : mode === 'danger' ? 512 : 768
+        maxOutputTokens: mode === 'summary' ? 256 : mode === 'danger' ? 512 : 1024
       }
     };
 
