@@ -23,7 +23,8 @@ const PRECACHE_URLS = [
   '/js/offline.js',
   '/manifest.json',
   '/icon-192.png',
-  '/icon-512.png'
+  '/icon-512.png',
+  '/screenshot.png'
 ];
 
 // CDN assets to cache on first use (too large to precache)
