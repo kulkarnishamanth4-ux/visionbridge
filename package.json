@@ -5,12 +5,17 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "build:android": "npx cap sync android",
+    "open:android": "npx cap open android"
   },
   "engines": {
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.4",
+    "@capacitor/cli": "^8.3.4",
+    "@capacitor/core": "^8.3.4",
     "@google/genai": "^1.0.0",
     "compression": "^1.8.1",
     "cors": "^2.8.5",

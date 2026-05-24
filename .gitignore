@@ -1,3 +1,9 @@
 .env
 .certs/
 node_modules/
+
+# Android build artifacts (source is tracked, build output is not)
+android/app/build/
+android/.gradle/
+android/build/
+android/local.properties

@@ -1,0 +1,22 @@
+{
+  "appId": "com.visionbridge.app",
+  "appName": "VisionBridge",
+  "webDir": "public",
+  "server": {
+    "androidScheme": "https",
+    "allowNavigation": ["*"]
+  },
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "launchShowDuration": 2000,
+      "backgroundColor": "#0a0e27",
+      "showSpinner": false
+    }
+  }
+}
