@@ -323,11 +323,11 @@
 
   </div>
 
-  <!-- TensorFlow.js + COCO-SSD -->
+  <!-- TensorFlow.js + COCO-SSD (must be sync - detector depends on them) -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
-  <!-- Tesseract.js for OCR -->
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <!-- Tesseract.js for OCR (deferred - only needed for Read mode) -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" defer></script>
 
   <!-- App Scripts -->
   <script src="js/camera.js"></script>

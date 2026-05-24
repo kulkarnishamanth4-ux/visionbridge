@@ -9,7 +9,7 @@ const nodemailer = require('nodemailer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-lite'];
+const MODELS = ['gemini-2.0-flash', 'gemini-2.0-flash-lite'];
 
 const responseCache = { analyze: null, measure: null, ask: null };
 
@@ -47,8 +47,8 @@ function isRetryable(err) {
  * Per-model: up to MAX_RETRIES attempts. Falls through to next model on exhaustion.
  */
 async function callWithFallback(client, requestConfig) {
-  const MAX_RETRIES = 2;
-  const BASE_DELAY_MS = 1000;  // 1s, 2s
+  const MAX_RETRIES = 1;
+  const BASE_DELAY_MS = 500;  // 500ms only
   let lastErr;
 
   for (const model of MODELS) {
@@ -491,37 +491,7 @@ app.post('/api/ask', async (req, res) => {
   }
 });
 
-// ========== TRANSLATION ENDPOINT ==========
-app.post('/api/translate', async (req, res) => {
-  const { text, targetLang } = req.body;
-  if (!text || !targetLang) return res.status(400).json({ error: 'text and targetLang required' });
-  if (targetLang === 'en') return res.json({ translated: text });
-
-  const langNames = {
-    hi: 'Hindi', es: 'Spanish', fr: 'French', de: 'German', ja: 'Japanese',
-    ko: 'Korean', zh: 'Chinese (Simplified)', ar: 'Arabic', pt: 'Portuguese',
-    ta: 'Tamil', te: 'Telugu', kn: 'Kannada', ru: 'Russian', it: 'Italian'
-  };
-  const langName = langNames[targetLang] || targetLang;
-
-  try {
-    const client = getGenAI();
-    if (!client) return res.json({ translated: text });
-
-    const response = await callWithFallback(client, {
-      contents: [{
-        role: 'user',
-        parts: [{ text: `Translate the following text to ${langName}. Return ONLY the translated text, nothing else. Do not add quotes or explanations.\n\n${text}` }]
-      }]
-    });
-
-    const translated = response.text?.trim() || text;
-    res.json({ translated });
-  } catch (err) {
-    console.warn('[Translate] Error:', err.message?.slice(0, 80));
-    res.json({ translated: text }); // Fallback to original
-  }
-});
+// (Old duplicate translate endpoint removed — the fast one is at line ~567)
 
 // --- Helper: Get local IP addresses ---
 function getLocalIPs() {

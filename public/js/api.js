@@ -7,16 +7,16 @@
 const ApiModule = (() => {
   const BASE = '';
 
-  // Generic fetch with 2 retries and fast delays (1s, 2s)
-  async function fetchWithRetry(url, options, maxAttempts = 2) {
-    const delays = [1000, 2000];
+  // Single attempt with 10s timeout — server retries internally and has cache fallback
+  async function fetchWithRetry(url, options, maxAttempts = 1) {
+    const delays = [800];
     let lastErr;
     let lastData;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout
+        const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
         const res = await fetch(url, { ...options, signal: controller.signal });
         clearTimeout(timeout);

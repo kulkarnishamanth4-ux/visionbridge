@@ -241,7 +241,7 @@
     // Start ambient sound monitoring
     try {
       await F.AmbientSound.init();
-      setInterval(updateAmbientSound, 2000);
+      setInterval(updateAmbientSound, 5000);
     } catch { /* no mic access */ }
   });
 
@@ -731,7 +731,7 @@
   let lastGeminiTime = 0;         // Timestamp of last Gemini call
   let lastLocalAnnounce = 0;      // Timestamp of last local announcement
   const REALTIME_INTERVAL = 1000; // Local detection every 1s
-  const GEMINI_INTERVAL = 10000;  // Rich Gemini description every 10s
+  const GEMINI_INTERVAL = 15000;  // Rich Gemini description every 15s
   const ANNOUNCE_COOLDOWN = 2000; // Don't repeat local announcements within 2s
 
   function startRealtime() {
