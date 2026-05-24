@@ -43,8 +43,8 @@ const ApiModule = (() => {
       }
     }
 
-    // Return last data if we got any, otherwise error object
-    return lastData || { error: lastErr?.message || 'Network error' };
+    // Return last data if we got any, otherwise return offline-friendly response
+    return lastData || { error: lastErr?.message || 'Network error', _offline: true };
   }
 
   async function checkStatus() {

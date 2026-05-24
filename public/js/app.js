@@ -647,37 +647,48 @@
 
     const hasGemini = geminiResult?.description && !geminiResult._cached && !geminiResult.description.includes('AI service');
 
+    // OFFLINE FALLBACK: Use OfflineModule when Gemini is unavailable
+    // This generates natural descriptions from local COCO-SSD detections
+    let offlineResult = null;
+    if (!hasGemini && detectedObjects.length > 0 && typeof OfflineModule !== 'undefined') {
+      offlineResult = OfflineModule.describeScene(detectedObjects, currentMode);
+    }
+
+    // Choose best available result
+    const bestResult = hasGemini ? geminiResult : offlineResult;
+
     // SPEAK RESULTS
     if (currentMode === 'danger') {
-      if (hasGemini && geminiResult.dangers?.length) {
-        UIModule.showDangers(geminiResult.dangers);
-        F.SpatialAudio.playForDangers(geminiResult.dangers);
-        F.Haptic.vibrateForDangers(geminiResult.dangers);
-        lastDescription = geminiResult.dangers.map(d => d.description).join('. ');
+      const dangers = bestResult?.dangers || localResult?.dangers || [];
+      if (dangers.length > 0) {
+        UIModule.showDangers(dangers);
+        F.SpatialAudio.playForDangers(dangers);
+        F.Haptic.vibrateForDangers(dangers);
+        lastDescription = dangers.map(d => d.description).join('. ');
         SpeechModule.speak('Danger! ' + lastDescription, SpeechModule.PRIORITY.DANGER);
-      } else if (!localResult?.dangers?.length) {
+      } else {
         lastDescription = 'No immediate dangers detected. Path appears clear.';
         UIModule.addDescription(lastDescription);
         SpeechModule.speak(lastDescription, SpeechModule.PRIORITY.DESCRIPTION);
         F.Haptic.vibrate('clear');
       }
     } else if (currentMode === 'summary') {
-      const text = hasGemini ? geminiResult.summary : (localResult?.summary || 'No objects detected.');
+      const text = bestResult?.summary || localResult?.summary || 'No objects detected.';
       lastDescription = text;
       UIModule.addDescription(text);
       SpeechModule.speak(text, SpeechModule.PRIORITY.DESCRIPTION);
     } else {
-      // Detailed
-      if (hasGemini) {
-        if (geminiResult.dangers?.length) {
+      // Detailed mode
+      if (bestResult?.description) {
+        if (bestResult.dangers?.length) {
           UIModule.setMode('danger');
-          UIModule.showDangers(geminiResult.dangers);
-          F.SpatialAudio.playForDangers(geminiResult.dangers);
-          F.Haptic.vibrateForDangers(geminiResult.dangers);
+          UIModule.showDangers(bestResult.dangers);
+          F.SpatialAudio.playForDangers(bestResult.dangers);
+          F.Haptic.vibrateForDangers(bestResult.dangers);
         }
-        lastDescription = geminiResult.description;
-        UIModule.addDescription(geminiResult.description);
-        SpeechModule.speak(geminiResult.description, SpeechModule.PRIORITY.DESCRIPTION);
+        lastDescription = bestResult.description;
+        UIModule.addDescription(bestResult.description);
+        SpeechModule.speak(bestResult.description, SpeechModule.PRIORITY.DESCRIPTION);
       } else if (localResult) {
         const text = localResult.description || localResult.summary;
         lastDescription = text;

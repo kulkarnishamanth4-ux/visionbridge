@@ -5,6 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
   <meta name="description" content="VisionBridge - AI-powered visual assistant for blind and visually impaired users. Real-time scene description, danger detection, and voice interaction.">
   <title>VisionBridge - AI Visual Assistant</title>
+
+  <!-- PWA Meta Tags -->
+  <meta name="theme-color" content="#0a0e27">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="VisionBridge">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -334,8 +345,59 @@
   <script src="js/speech.js"></script>
   <script src="js/detector.js"></script>
   <script src="js/features.js"></script>
+  <script src="js/offline.js"></script>
   <script src="js/api.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/app.js"></script>
+
+  <!-- PWA: Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(reg => console.log('[PWA] Service Worker registered, scope:', reg.scope))
+          .catch(err => console.warn('[PWA] SW registration failed:', err.message));
+      });
+    }
+
+    // PWA Install Prompt
+    let deferredInstallPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      // Show install banner
+      const banner = document.createElement('div');
+      banner.id = 'pwa-install-banner';
+      banner.setAttribute('role', 'alert');
+      banner.innerHTML = `
+        <div style="position:fixed;bottom:0;left:0;right:0;padding:16px;background:linear-gradient(135deg,#1a1040,#0a0e27);border-top:2px solid #7b61ff;display:flex;align-items:center;justify-content:space-between;z-index:9999;font-family:Inter,sans-serif;">
+          <div style="color:#fff;font-size:14px;">
+            <strong>Install VisionBridge</strong><br>
+            <span style="color:#aaa;font-size:12px;">Works offline as a standalone app</span>
+          </div>
+          <button id="pwa-install-btn" style="padding:10px 20px;background:linear-gradient(135deg,#00d4ff,#7b61ff);color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px;">Install</button>
+          <button id="pwa-dismiss-btn" style="padding:10px;background:none;color:#888;border:none;cursor:pointer;font-size:18px;">&times;</button>
+        </div>
+      `;
+      document.body.appendChild(banner);
+
+      document.getElementById('pwa-install-btn').addEventListener('click', async () => {
+        if (deferredInstallPrompt) {
+          deferredInstallPrompt.prompt();
+          const result = await deferredInstallPrompt.userChoice;
+          console.log('[PWA] Install result:', result.outcome);
+          deferredInstallPrompt = null;
+        }
+        banner.remove();
+      });
+      document.getElementById('pwa-dismiss-btn').addEventListener('click', () => banner.remove());
+    });
+
+    window.addEventListener('appinstalled', () => {
+      console.log('[PWA] App installed!');
+      const banner = document.getElementById('pwa-install-banner');
+      if (banner) banner.remove();
+    });
+  </script>
 </body>
 </html>
