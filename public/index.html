@@ -303,7 +303,8 @@
 
     <!-- Onboarding Overlay -->
     <div id="onboarding" class="onboarding-overlay" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
-      <div class="onboarding-card">
+      <!-- Step 1: Welcome -->
+      <div class="onboarding-card" id="onboarding-step-1">
         <div class="onboarding-icon" aria-hidden="true">
           <svg viewBox="0 0 80 80" fill="none">
             <circle cx="40" cy="40" r="36" stroke="url(#onbGrad)" stroke-width="3"/>
@@ -323,12 +324,61 @@
           <li><span class="feature-icon">&#x1F4F3;</span><span><strong>Haptic vibration</strong> for instant danger feedback</span></li>
           <li><span class="feature-icon">&#x1F198;</span><span><strong>Emergency SOS</strong> - shake hard or say "Help"</span></li>
         </ul>
-        <button id="btn-start" class="start-btn" aria-label="Start VisionBridge">
-          <span>Get Started</span>
+        <button id="btn-next-step" class="start-btn" aria-label="Continue to wake word setup">
+          <span>Next</span>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
           </svg>
         </button>
+      </div>
+
+      <!-- Step 2: Wake Word Setup -->
+      <div class="onboarding-card hidden" id="onboarding-step-2">
+        <div class="onboarding-icon" aria-hidden="true">
+          <svg viewBox="0 0 80 80" fill="none">
+            <circle cx="40" cy="40" r="36" stroke="url(#onbGrad)" stroke-width="3" stroke-dasharray="8 4" opacity="0.4"/>
+            <rect x="28" y="14" width="24" height="36" rx="12" stroke="url(#onbGrad)" stroke-width="3" fill="none"/>
+            <path d="M16 40c0 13.255 10.745 24 24 24s24-10.745 24-24" stroke="url(#onbGrad)" stroke-width="2.5" fill="none" opacity="0.6"/>
+            <line x1="40" y1="64" x2="40" y2="72" stroke="url(#onbGrad)" stroke-width="2.5"/>
+            <line x1="30" y1="72" x2="50" y2="72" stroke="url(#onbGrad)" stroke-width="2.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h2>Set Your Wake Word</h2>
+        <p class="onboarding-desc">Choose a wake word to activate voice commands hands-free. You'll say this word anytime you want to ask a question.</p>
+
+        <div class="wake-word-setup">
+          <label for="wake-word-setup-input" class="wake-setup-label">Type your wake word</label>
+          <input type="text" id="wake-word-setup-input" class="wake-setup-input" value="hey vision" placeholder="e.g. hey vision" autocomplete="off" spellcheck="false">
+
+          <div id="wake-confirm-section" class="wake-confirm-section">
+            <button id="btn-confirm-wake" class="wake-confirm-btn" aria-label="Confirm wake word by saying it">
+              <span class="wake-mic-icon" id="wake-mic-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="2" width="6" height="12" rx="3"/>
+                  <path d="M5 12c0 3.866 3.134 7 7 7s7-3.134 7-7"/>
+                  <line x1="12" y1="19" x2="12" y2="22"/>
+                </svg>
+              </span>
+              <span id="wake-confirm-text">Tap & Say Your Wake Word</span>
+            </button>
+            <p class="wake-hint" id="wake-hint">We'll listen for your wake word to make sure it works</p>
+          </div>
+
+          <div id="wake-status" class="wake-status hidden">
+            <span id="wake-status-icon"></span>
+            <span id="wake-status-text"></span>
+          </div>
+        </div>
+
+        <div class="wake-setup-actions">
+          <button id="btn-start" class="start-btn" aria-label="Start VisionBridge">
+            <span>Get Started</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+            </svg>
+          </button>
+          <button id="btn-skip-wake" class="skip-wake-btn" aria-label="Skip wake word setup">Skip for now</button>
+        </div>
       </div>
     </div>
 

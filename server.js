@@ -529,6 +529,18 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log('[!] SOS Email not configured. Set SOS_EMAIL_USER and SOS_EMAIL_PASS in .env');
   }
 
+  if (process.env.NUMVERIFY_API_KEY) {
+    console.log('[OK] Numverify API configured — phone number validation enabled.');
+  } else {
+    console.log('[!] NUMVERIFY_API_KEY not set — phone validation will use regex only.');
+  }
+
+  if (process.env.MAILBOXLAYER_API_KEY) {
+    console.log('[OK] Mailboxlayer API configured — email validation enabled.');
+  } else {
+    console.log('[!] MAILBOXLAYER_API_KEY not set — email validation will use regex only.');
+  }
+
   console.log('\n[TIP] To access from your phone or any device, run this in a NEW terminal:');
   console.log('   npx ngrok http 3000');
   console.log('   Then open the https://xxxx.ngrok-free.app URL on any device.\n');
@@ -625,6 +637,163 @@ app.get('/api/test-email', async (req, res) => {
       error: 'SMTP connection failed: ' + err.message,
       hint: 'Make sure you are using a Gmail App Password (not your regular password). Get one at https://myaccount.google.com/apppasswords'
     });
+  }
+});
+
+// =============================================
+//   CONTACT VALIDATION (Numverify + Mailboxlayer)
+// =============================================
+
+/**
+ * Validate a phone number using Numverify API.
+ * Returns { valid, international_format, carrier, line_type, country_name }
+ */
+async function validatePhoneNumverify(phone) {
+  const apiKey = process.env.NUMVERIFY_API_KEY;
+  if (!apiKey) return { valid: true, skipped: true, reason: 'NUMVERIFY_API_KEY not set, skipping validation.' };
+
+  try {
+    const cleanNumber = phone.replace(/[\s\-\(\)]/g, '');
+    const url = `http://apilayer.net/api/validate?access_key=${apiKey}&number=${encodeURIComponent(cleanNumber)}`;
+    const resp = await fetch(url);
+    const data = await resp.json();
+
+    if (data.error) {
+      console.warn('[Numverify] API error:', data.error.info);
+      return { valid: true, skipped: true, reason: data.error.info };
+    }
+
+    console.log(`[Numverify] ${cleanNumber} → valid=${data.valid}, type=${data.line_type}, carrier=${data.carrier}`);
+    return {
+      valid: data.valid === true,
+      international_format: data.international_format || cleanNumber,
+      carrier: data.carrier || 'Unknown',
+      line_type: data.line_type || 'unknown',
+      country_name: data.country_name || 'Unknown',
+      location: data.location || ''
+    };
+  } catch (err) {
+    console.warn('[Numverify] Fetch failed:', err.message);
+    return { valid: true, skipped: true, reason: 'Validation service unavailable.' };
+  }
+}
+
+/**
+ * Validate an email using Mailboxlayer API.
+ * Returns { format_valid, mx_found, smtp_check, disposable, did_you_mean, score }
+ */
+async function validateEmailMailboxlayer(email) {
+  const apiKey = process.env.MAILBOXLAYER_API_KEY;
+  if (!apiKey) return { format_valid: true, skipped: true, reason: 'MAILBOXLAYER_API_KEY not set, skipping validation.' };
+
+  try {
+    const url = `http://apilayer.net/api/check?access_key=${apiKey}&email=${encodeURIComponent(email)}&smtp=1&format=1`;
+    const resp = await fetch(url);
+    const data = await resp.json();
+
+    if (data.error) {
+      console.warn('[Mailboxlayer] API error:', data.error.info);
+      return { format_valid: true, skipped: true, reason: data.error.info };
+    }
+
+    console.log(`[Mailboxlayer] ${email} → format=${data.format_valid}, mx=${data.mx_found}, smtp=${data.smtp_check}, disposable=${data.disposable}, score=${data.score}`);
+    return {
+      format_valid: data.format_valid === true,
+      mx_found: data.mx_found === true,
+      smtp_check: data.smtp_check === true,
+      disposable: data.disposable === true,
+      did_you_mean: data.did_you_mean || '',
+      score: data.score || 0,
+      free: data.free === true
+    };
+  } catch (err) {
+    console.warn('[Mailboxlayer] Fetch failed:', err.message);
+    return { format_valid: true, skipped: true, reason: 'Validation service unavailable.' };
+  }
+}
+
+// =============================================
+//   VALIDATE CONTACT ENDPOINT
+// =============================================
+app.post('/api/validate-contact', async (req, res) => {
+  try {
+    const { contact, type } = req.body;
+    if (!contact || !type) {
+      return res.json({ valid: false, error: 'Contact and type are required.' });
+    }
+
+    if (type === 'email') {
+      // Basic regex check first
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact)) {
+        return res.json({ valid: false, error: 'Invalid email format. Use: abc@email.com' });
+      }
+
+      const result = await validateEmailMailboxlayer(contact);
+
+      if (result.skipped) {
+        // API not configured — fall back to regex-only validation
+        return res.json({ valid: true, message: 'Email format is valid.', skipped: true });
+      }
+
+      if (!result.format_valid) {
+        return res.json({ valid: false, error: 'This email address has invalid formatting.' });
+      }
+      if (result.disposable) {
+        return res.json({ valid: false, error: 'Disposable/temporary emails are not allowed for emergency contacts. Please use a permanent email.' });
+      }
+      if (!result.mx_found) {
+        const suggestion = result.did_you_mean ? ` Did you mean: ${result.did_you_mean}?` : '';
+        return res.json({ valid: false, error: `The domain "${contact.split('@')[1]}" does not appear to have a mail server.${suggestion}` });
+      }
+      if (result.did_you_mean) {
+        return res.json({ valid: true, message: `Email is valid.`, suggestion: result.did_you_mean, score: result.score });
+      }
+      if (result.score < 0.4) {
+        return res.json({ valid: false, error: 'This email address appears to be invalid or unreachable. Please double-check and try again.' });
+      }
+
+      return res.json({
+        valid: true,
+        message: `Email verified: ${contact}`,
+        score: result.score,
+        free: result.free
+      });
+    }
+
+    if (type === 'phone') {
+      // Basic regex check first
+      const cleanPhone = contact.replace(/[\s\-]/g, '');
+      if (!/^\+\d{10,15}$/.test(cleanPhone)) {
+        return res.json({ valid: false, error: 'Invalid phone format. Use international format: +919999988888' });
+      }
+
+      const result = await validatePhoneNumverify(cleanPhone);
+
+      if (result.skipped) {
+        return res.json({ valid: true, message: 'Phone format is valid.', skipped: true });
+      }
+
+      if (!result.valid) {
+        return res.json({ valid: false, error: `This phone number is not valid. Please check the country code and number.` });
+      }
+      if (result.line_type === 'landline') {
+        return res.json({ valid: false, error: `This appears to be a landline number (${result.carrier}). Please use a mobile number for emergency contact.` });
+      }
+
+      return res.json({
+        valid: true,
+        message: `Phone verified: ${result.international_format || cleanPhone}`,
+        carrier: result.carrier,
+        line_type: result.line_type,
+        country: result.country_name,
+        formatted: result.international_format || cleanPhone
+      });
+    }
+
+    res.json({ valid: false, error: 'Unknown contact type.' });
+  } catch (err) {
+    console.error('[Validate] Error:', err.message);
+    res.json({ valid: true, skipped: true, error: 'Validation service error, proceeding anyway.' });
   }
 });
 

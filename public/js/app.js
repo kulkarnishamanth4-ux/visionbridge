@@ -111,7 +111,7 @@
     showSosStatus('\u2705 Contact verified: ' + F.EmergencySOS.getContact(), 'ok');
   }
 
-  // SEND OTP button
+  // SEND OTP button (with Numverify/Mailboxlayer validation)
   if (sosSendOtpBtn) {
     sosSendOtpBtn.addEventListener('click', async () => {
       const type = F.EmergencySOS.getContactType();
@@ -120,7 +120,7 @@
         showSosStatus('Please enter a contact first.', 'err');
         return;
       }
-      // Validate format
+      // Quick client-side format check
       if (type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact)) {
         showSosStatus('Invalid email. Use format: abc@email.com', 'err');
         return;
@@ -131,7 +131,47 @@
       }
 
       sosSendOtpBtn.disabled = true;
-      sosSendOtpBtn.textContent = 'Sending...';
+      sosSendOtpBtn.textContent = 'Validating...';
+      showSosStatus('Validating your contact...', 'info');
+
+      // Step 1: Validate contact via Numverify/Mailboxlayer
+      try {
+        const valRes = await fetch('/api/validate-contact', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contact, type })
+        });
+        const valData = await valRes.json();
+
+        if (!valData.valid) {
+          showSosStatus(valData.error || 'Contact validation failed.', 'err');
+          sosSendOtpBtn.disabled = false;
+          sosSendOtpBtn.textContent = 'Send Verification Code';
+          return;
+        }
+
+        // Show validation details
+        let validMsg = '';
+        if (type === 'phone' && valData.carrier) {
+          validMsg = `✅ Valid ${valData.line_type || 'mobile'} number (${valData.carrier}, ${valData.country || ''})`;
+          showSosStatus(validMsg, 'ok');
+        } else if (type === 'email' && valData.score) {
+          validMsg = `✅ Email verified (quality: ${Math.round(valData.score * 100)}%)`;
+          showSosStatus(validMsg, 'ok');
+        }
+
+        // Show suggestion if email has a typo
+        if (valData.suggestion) {
+          showSosStatus(`⚠️ Did you mean: ${valData.suggestion}? Proceeding with ${contact}...`, 'info');
+          await new Promise(r => setTimeout(r, 2000));
+        }
+      } catch {
+        // Validation service down — proceed anyway (graceful degradation)
+        console.warn('[SOS] Validation service unreachable, proceeding with OTP.');
+      }
+
+      // Step 2: Send OTP
+      sosSendOtpBtn.textContent = 'Sending OTP...';
       showSosStatus('Sending verification code...', 'info');
 
       try {
@@ -145,10 +185,10 @@
           if (data.directVerify) {
             // Phone: verified directly by format (no SMS service)
             F.EmergencySOS.setVerified(true);
-            showSosStatus('\u2705 Phone number verified: ' + contact, 'ok');
+            showSosStatus('✅ Phone number verified: ' + contact, 'ok');
           } else {
             // Email: OTP sent, show input field
-            showSosStatus('\u2709\uFE0F Code sent to ' + contact + '. Check your inbox.', 'ok');
+            showSosStatus('✉️ Code sent to ' + contact + '. Check your inbox.', 'ok');
             if (sosOtpGroup) sosOtpGroup.classList.remove('hidden');
             if (sosOtpInput) sosOtpInput.focus();
           }
@@ -219,13 +259,107 @@
     });
   });
 
-  // --- Onboarding ---
-  UIModule.els.btnStart.addEventListener('click', async () => {
+  // --- Onboarding: Step 1 → Step 2 ---
+  const step1 = document.getElementById('onboarding-step-1');
+  const step2 = document.getElementById('onboarding-step-2');
+  const btnNextStep = document.getElementById('btn-next-step');
+  const wakeSetupInput = document.getElementById('wake-word-setup-input');
+  const btnConfirmWake = document.getElementById('btn-confirm-wake');
+  const wakeConfirmText = document.getElementById('wake-confirm-text');
+  const wakeMicIcon = document.getElementById('wake-mic-icon');
+  const wakeHint = document.getElementById('wake-hint');
+  const wakeStatus = document.getElementById('wake-status');
+  const wakeStatusIcon = document.getElementById('wake-status-icon');
+  const wakeStatusText = document.getElementById('wake-status-text');
+  const btnSkipWake = document.getElementById('btn-skip-wake');
+
+  let wakeWordConfirmed = false;
+
+  // Step 1 → Step 2 transition
+  btnNextStep.addEventListener('click', () => {
+    step1.classList.add('hidden');
+    step2.classList.remove('hidden');
+  });
+
+  // Wake word confirmation: listen for the user saying their chosen wake word
+  btnConfirmWake.addEventListener('click', async () => {
+    const chosenWord = wakeSetupInput.value.trim().toLowerCase();
+    if (!chosenWord || chosenWord.length < 2) {
+      showWakeStatus('error', '⚠️', 'Please type a wake word first');
+      wakeSetupInput.focus();
+      return;
+    }
+
+    // Set the wake word in SpeechModule so matchesWakeWord works
+    SpeechModule.setWakeWord(chosenWord);
+
+    // Visual: switch to listening state
+    btnConfirmWake.classList.add('listening');
+    btnConfirmWake.classList.remove('confirmed');
+    wakeConfirmText.textContent = 'Listening... Say "' + chosenWord + '"';
+    wakeHint.textContent = 'Speak clearly into your microphone';
+    hideWakeStatus();
+
+    try {
+      const transcript = await SpeechModule.listenOnce(8000);
+      const heard = transcript.toLowerCase();
+
+      if (SpeechModule.matchesWakeWord(heard)) {
+        // Success!
+        wakeWordConfirmed = true;
+        btnConfirmWake.classList.remove('listening');
+        btnConfirmWake.classList.add('confirmed');
+        wakeConfirmText.textContent = '✓ Wake word confirmed!';
+        wakeHint.textContent = 'We heard: "' + transcript + '"';
+        showWakeStatus('success', '✅', 'Wake word "' + chosenWord + '" is set and working!');
+        // Also update the settings input
+        if (UIModule.els.wakeWordInput) UIModule.els.wakeWordInput.value = chosenWord;
+      } else {
+        // Didn't match
+        btnConfirmWake.classList.remove('listening');
+        wakeConfirmText.textContent = 'Tap & Say Your Wake Word';
+        wakeHint.textContent = 'We heard "' + transcript + '" — try again';
+        showWakeStatus('error', '❌', 'Didn\'t match. We heard: "' + transcript + '"');
+      }
+    } catch (err) {
+      btnConfirmWake.classList.remove('listening');
+      wakeConfirmText.textContent = 'Tap & Say Your Wake Word';
+      if (err.message === 'timeout' || err.message === 'no-speech') {
+        wakeHint.textContent = 'No speech detected. Tap the button and speak.';
+        showWakeStatus('error', '🔇', 'No speech detected. Please try again.');
+      } else if (err.message === 'not-allowed') {
+        wakeHint.textContent = 'Microphone access denied.';
+        showWakeStatus('error', '🚫', 'Microphone access is required. Please allow it in your browser settings.');
+      } else {
+        wakeHint.textContent = 'Could not listen. Try again.';
+        showWakeStatus('error', '⚠️', 'Speech recognition error: ' + err.message);
+      }
+    }
+  });
+
+  function showWakeStatus(type, icon, text) {
+    wakeStatus.className = 'wake-status ' + type;
+    wakeStatusIcon.textContent = icon;
+    wakeStatusText.textContent = text;
+  }
+  function hideWakeStatus() {
+    wakeStatus.className = 'wake-status hidden';
+  }
+
+  // Common function to finalize onboarding and start the app
+  async function finalizeOnboarding() {
+    // Set the wake word from the input (even if not confirmed by voice)
+    const chosenWord = wakeSetupInput.value.trim().toLowerCase();
+    if (chosenWord && chosenWord.length >= 2) {
+      SpeechModule.setWakeWord(chosenWord);
+      if (UIModule.els.wakeWordInput) UIModule.els.wakeWordInput.value = chosenWord;
+    }
+
     UIModule.hideOnboarding();
     SpeechModule.unlockAudio();
     const camResult = await CameraModule.startCamera();
     if (camResult.success) {
-      SpeechModule.speak('Welcome to VisionBridge. Loading detection systems...', SpeechModule.PRIORITY.INFO);
+      SpeechModule.speak('Welcome to VisionBridge. Your wake word is set to "' + (chosenWord || 'hey vision') + '". Loading detection systems...', SpeechModule.PRIORITY.INFO);
     } else {
       SpeechModule.speak('Could not access camera. Please grant permission.', SpeechModule.PRIORITY.INFO);
       return;
@@ -243,7 +377,13 @@
       await F.AmbientSound.init();
       setInterval(updateAmbientSound, 5000);
     } catch { /* no mic access */ }
-  });
+  }
+
+  // Get Started button (Step 2)
+  UIModule.els.btnStart.addEventListener('click', () => finalizeOnboarding());
+
+  // Skip wake word setup
+  btnSkipWake.addEventListener('click', () => finalizeOnboarding());
 
   // --- SOS handler (fully automated, zero user interaction) ---
   function handleSOS(reason, locationPromise) {

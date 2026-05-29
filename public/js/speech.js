@@ -170,6 +170,66 @@ const SpeechModule = (() => {
     }
   }
 
+  /**
+   * One-shot listen: creates a temporary recognition session that resolves
+   * with the heard transcript after the first final result, or rejects on
+   * timeout (default 8s). Used for wake word confirmation during onboarding.
+   */
+  function listenOnce(timeoutMs = 8000) {
+    return new Promise((resolve, reject) => {
+      if (!SpeechRecognition) {
+        return reject(new Error('Speech recognition not supported'));
+      }
+
+      const tempRec = new SpeechRecognition();
+      tempRec.continuous = false;
+      tempRec.interimResults = false;
+      tempRec.lang = 'en-US';
+      let settled = false;
+
+      const timer = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          try { tempRec.stop(); } catch (e) { /* ignore */ }
+          reject(new Error('timeout'));
+        }
+      }, timeoutMs);
+
+      tempRec.onresult = (event) => {
+        if (settled) return;
+        const last = event.results[event.results.length - 1];
+        if (!last.isFinal) return;
+        settled = true;
+        clearTimeout(timer);
+        try { tempRec.stop(); } catch (e) { /* ignore */ }
+        resolve(last[0].transcript.trim());
+      };
+
+      tempRec.onerror = (event) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        reject(new Error(event.error));
+      };
+
+      tempRec.onend = () => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          reject(new Error('no-speech'));
+        }
+      };
+
+      try {
+        tempRec.start();
+      } catch (e) {
+        settled = true;
+        clearTimeout(timer);
+        reject(e);
+      }
+    });
+  }
+
   function triggerQuestionMode() {
     awaitingQuestion = true;
     setTimeout(() => { awaitingQuestion = false; }, 10000);
@@ -408,7 +468,7 @@ const SpeechModule = (() => {
 
   return {
     initRecognition, startListening, stopListening,
-    triggerQuestionMode,
+    triggerQuestionMode, listenOnce, matchesWakeWord,
     initSynthesis, loadVoices,
     speak, stopSpeaking, isSpeakingNow,
     unlockAudio, playDangerBeep,

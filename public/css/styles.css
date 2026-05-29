@@ -671,3 +671,172 @@ body.night-mode {
   --bg-primary: #000000; --bg-secondary: #0a0a0a; --bg-card: rgba(10,10,10,0.9);
 }
 body.night-mode .status-ring { box-shadow: 0 0 30px rgba(0,212,255,0.2); }
+
+/* ===== Wake Word Setup (Onboarding Step 2) ===== */
+.onboarding-card.hidden { display: none; }
+
+.wake-word-setup {
+  text-align: left;
+  margin-bottom: 24px;
+}
+
+.wake-setup-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.wake-setup-input {
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 2px solid rgba(255,255,255,0.1);
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: 1.1rem;
+  font-weight: 600;
+  text-align: center;
+  letter-spacing: 1px;
+  transition: var(--transition);
+  outline: none;
+}
+.wake-setup-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+.wake-confirm-section {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.wake-confirm-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, rgba(0,212,255,0.12), rgba(123,97,255,0.08));
+  border: 2px solid rgba(0,212,255,0.25);
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  font-family: var(--font);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.wake-confirm-btn:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 24px var(--accent-glow);
+  transform: translateY(-1px);
+}
+
+.wake-mic-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+}
+.wake-mic-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.wake-confirm-btn.listening {
+  border-color: var(--success);
+  color: var(--success);
+  background: linear-gradient(135deg, rgba(0,255,136,0.12), rgba(0,212,255,0.08));
+  animation: wake-listen-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes wake-listen-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0,255,136,0.3); }
+  50% { box-shadow: 0 0 0 12px rgba(0,255,136,0); }
+}
+
+.wake-confirm-btn.confirmed {
+  border-color: var(--success);
+  color: var(--success);
+  background: rgba(0,255,136,0.1);
+  animation: none;
+}
+
+.wake-hint {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  opacity: 0.7;
+  text-align: center;
+  margin: 0;
+}
+
+.wake-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 600;
+  animation: fade-up 0.3s ease-out;
+}
+.wake-status.hidden { display: none; }
+.wake-status.success {
+  background: rgba(0,255,136,0.1);
+  border: 1px solid rgba(0,255,136,0.3);
+  color: var(--success);
+}
+.wake-status.error {
+  background: rgba(255,51,102,0.1);
+  border: 1px solid rgba(255,51,102,0.3);
+  color: var(--danger);
+}
+.wake-status.info {
+  background: rgba(0,212,255,0.1);
+  border: 1px solid rgba(0,212,255,0.3);
+  color: var(--accent);
+}
+
+.wake-setup-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.skip-wake-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-family: var(--font);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 8px 16px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: var(--transition);
+}
+.skip-wake-btn:hover {
+  color: var(--text-primary);
+}
+
+/* Email/phone input style fix */
+.setting-group input[type="email"],
+.setting-group input[type="tel"] {
+  background: var(--bg-primary); color: var(--text-primary);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: var(--radius-sm);
+  padding: 10px 12px; font-family: var(--font); font-size: 0.85rem;
+}
