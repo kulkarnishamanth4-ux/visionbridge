@@ -4,7 +4,7 @@
  * Strategy: Cache-first for static assets, network-first for API calls.
  */
 
-const CACHE_VERSION = 'vb-v3';
+const CACHE_VERSION = 'vb-v4';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const API_CACHE = `${CACHE_VERSION}-api`;
 
@@ -21,6 +21,7 @@ const PRECACHE_URLS = [
   '/js/ui.js',
   '/js/app.js',
   '/js/offline.js',
+  '/js/assistant.js',
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png',

@@ -102,5 +102,22 @@ const ApiModule = (() => {
     };
   }
 
-  return { checkStatus, analyzeScene, measureScene, askQuestion };
+  async function askAssistant(question, base64Image, history) {
+    const body = { question };
+    if (base64Image) body.image = base64Image;
+    if (history && history.length) body.history = history;
+
+    const data = await fetchWithRetry(`${BASE}/api/assistant`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    return {
+      answer: data.answer || 'I couldn\'t process that right now.',
+      _cached: data._cached || false
+    };
+  }
+
+  return { checkStatus, analyzeScene, measureScene, askQuestion, askAssistant };
 })();

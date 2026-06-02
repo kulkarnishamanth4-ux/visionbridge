@@ -475,6 +475,7 @@ const SpeechModule = (() => {
     setWakeWord, setVoice, setRate, setLanguage,
     onWakeWord, onTranscript, onSpeakStart, onSpeakEnd,
     getLanguage() { return currentLang; },
+    getRate() { return speechRate; },
     get isListening() { return isListening; },
     get isSpeaking() { return isSpeaking; },
     get isSupported() { return recognitionSupported; },

@@ -491,6 +491,125 @@ app.post('/api/ask', async (req, res) => {
   }
 });
 
+// =============================================
+//   AI ASSISTANT ENDPOINT
+//   Conversational assistant with India-aware navigation guidance.
+//   Accepts optional image + conversation history for context.
+// =============================================
+
+const ASSISTANT_SYSTEM_PROMPT = `You are "Vision", a personal AI assistant built into VisionBridge — a wearable device for blind and visually impaired people in India.
+
+CORE RULES:
+1. Speak naturally and conversationally, like a helpful friend walking beside the user.
+2. Keep responses SHORT (2-4 sentences max) unless the user asks for detail.
+3. Use clock directions for spatial guidance: "at your 2 o'clock", "slightly to your left".
+4. Always give ACTIONABLE guidance — tell the user what to DO, not just what you see.
+5. When you see an obstacle, ALWAYS tell: what it is, approximate size, exact position, and how to navigate around it.
+6. You understand Indian roads and hazards deeply.
+
+NAVIGATION GUIDANCE (CRITICAL):
+When describing obstacles, ALWAYS provide:
+- WHAT: Name of the object (car, pothole, cow, auto-rickshaw, etc.)
+- SIZE: Approximate dimensions (e.g., "about 4 meters long, 1.5 meters wide")  
+- POSITION: Exact location relative to user (e.g., "directly ahead, about 3 meters away, slightly to your right")
+- NAVIGATION: Clear instructions to get around it (e.g., "Take 2 steps to your left, then continue straight")
+
+INDIAN ROAD HAZARDS (be especially alert for these):
+- Stray dogs, cows, goats, monkeys — common on Indian roads. Warn about animals that might be resting on the path or moving unpredictably.
+- Potholes and uneven surfaces — extremely common. Warn about any visible road damage or level changes.
+- Auto-rickshaws, bikes, two-wheelers — often drive close to pedestrians and on footpaths.
+- Open drains and manholes — sometimes uncovered. CRITICAL danger.
+- Speed breakers — sudden raised bumps that could cause tripping.
+- Parked vehicles on footpaths — force pedestrians onto the road.
+- Construction debris, rubble, sand piles — common obstructions.
+- Hawkers and street vendors — may narrow the walkable path.
+- Loose cables or wires — hanging at head height from poles.
+- Wet or muddy surfaces — slippery after rain.
+
+OBSTACLE DIMENSIONS REFERENCE:
+- Car: ~4m long × 1.8m wide × 1.5m tall
+- Auto-rickshaw: ~2.6m long × 1.3m wide × 1.7m tall  
+- Motorcycle/Scooter: ~2m long × 0.7m wide × 1.1m tall
+- Bicycle: ~1.8m long × 0.6m wide × 1m tall
+- Bus: ~10-12m long × 2.5m wide × 3m tall
+- Truck: ~8-10m long × 2.5m wide × 3.5m tall
+- Cow: ~2.5m long × 1.5m wide × 1.5m tall, may move unpredictably
+- Dog: ~0.6m long × 0.3m wide, may be aggressive or sleeping on path
+- Pothole: varies, typically 0.3-1m wide, 5-30cm deep
+
+GENERAL ASSISTANT:
+- Answer general knowledge questions concisely.
+- For follow-up questions, use the conversation history for context.
+- If asked about something you described earlier, reference it.
+- Be warm, reassuring, and confident in your guidance.
+- If you cannot see clearly, say so honestly and suggest what the user should do.`;
+
+app.post('/api/assistant', async (req, res) => {
+  try {
+    const client = getGenAI();
+    if (!client) {
+      return res.status(503).json({
+        answer: 'I need an internet connection to answer that question right now.'
+      });
+    }
+
+    const { question, image, history } = req.body;
+    if (!question) {
+      return res.status(400).json({ error: 'Question is required.' });
+    }
+
+    // Build conversation parts
+    const parts = [];
+
+    // Add image if provided (for scene questions)
+    if (image) {
+      const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
+      parts.push({
+        inlineData: {
+          mimeType: 'image/jpeg',
+          data: base64Data
+        }
+      });
+    }
+
+    // Build content with history for context
+    const contents = [];
+
+    // Add conversation history (last few exchanges)
+    if (history && Array.isArray(history)) {
+      for (const h of history.slice(-8)) {
+        contents.push({
+          role: h.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: h.content }]
+        });
+      }
+    }
+
+    // Current question with optional image
+    const currentParts = [...parts, { text: question }];
+    contents.push({ role: 'user', parts: currentParts });
+
+    const requestConfig = {
+      contents,
+      config: {
+        systemInstruction: ASSISTANT_SYSTEM_PROMPT,
+        temperature: 0.5,
+        maxOutputTokens: 300
+      }
+    };
+
+    const response = await callWithFallback(client, requestConfig);
+    const answer = response.text.trim();
+
+    res.json({ answer });
+  } catch (err) {
+    console.error('[Assistant] Error:', err.message);
+    res.status(200).json({
+      answer: 'I\'m having trouble thinking right now. Please try again in a moment.'
+    });
+  }
+});
+
 // (Old duplicate translate endpoint removed — the fast one is at line ~567)
 
 // --- Helper: Get local IP addresses ---

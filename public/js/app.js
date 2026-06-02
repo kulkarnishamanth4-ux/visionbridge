@@ -610,7 +610,7 @@
     UIModule.toggleCameraPreview(cameraPreviewVisible);
   });
 
-  // --- Wake Word & Transcript ---
+  // --- Wake Word & Transcript → AI Assistant ---
   SpeechModule.onWakeWord(() => {
     SpeechModule.stopSpeaking();
     SpeechModule.speak("I'm listening.", SpeechModule.PRIORITY.DESCRIPTION);
@@ -619,25 +619,46 @@
 
   SpeechModule.onTranscript(async (question) => {
     UIModule.setListenActive(false); UIModule.setMode('scanning');
-    // Check for SOS voice trigger
-    if (question.toLowerCase().includes('help') || question.toLowerCase().includes('emergency')) {
-      F.EmergencySOS.triggerSOS('Voice SOS: "' + question + '"');
-      return;
-    }
-    SpeechModule.speak('Let me look...', SpeechModule.PRIORITY.INFO);
-    const frame = CameraModule.captureFrame();
-    if (!frame) { SpeechModule.speak('Camera not active.', SpeechModule.PRIORITY.DESCRIPTION); UIModule.setMode('idle'); return; }
-    if (geminiAvailable) {
-      const result = await ApiModule.askQuestion(frame, question);
-      P.recordAPI(!result._cached);
-      UIModule.addQA(question, result.answer);
-      SpeechModule.speak(result.answer, SpeechModule.PRIORITY.DESCRIPTION);
+
+    // Route everything through the AI Assistant
+    if (typeof AssistantModule !== 'undefined') {
+      const result = await AssistantModule.processCommand(question, {
+        getFrame: () => CameraModule.captureFrame(),
+        geminiAvailable,
+        detectObjects: true
+      });
+
+      if (result.response === null) {
+        // Command handled silently (e.g., "stop")
+        return;
+      }
+
+      if (result.response) {
+        UIModule.addQA(question, result.response);
+        SpeechModule.speak(result.response, SpeechModule.PRIORITY.DESCRIPTION);
+        AssistantModule.setLastDescription(result.response);
+      }
     } else {
-      const video = document.getElementById('camera-feed');
-      const objs = await DetectorModule.detect(video);
-      const r = DetectorModule.processForSpeech(objs, 'detailed');
-      UIModule.addQA(question, r.description || 'I can detect objects but need the AI for specific questions.');
-      SpeechModule.speak(r.description || r.summary, SpeechModule.PRIORITY.DESCRIPTION);
+      // Fallback: original behavior if AssistantModule not loaded
+      if (question.toLowerCase().includes('help') || question.toLowerCase().includes('emergency')) {
+        F.EmergencySOS.triggerSOS('Voice SOS: "' + question + '"');
+        return;
+      }
+      SpeechModule.speak('Let me look...', SpeechModule.PRIORITY.INFO);
+      const frame = CameraModule.captureFrame();
+      if (!frame) { SpeechModule.speak('Camera not active.', SpeechModule.PRIORITY.DESCRIPTION); UIModule.setMode('idle'); return; }
+      if (geminiAvailable) {
+        const result = await ApiModule.askQuestion(frame, question);
+        P.recordAPI(!result._cached);
+        UIModule.addQA(question, result.answer);
+        SpeechModule.speak(result.answer, SpeechModule.PRIORITY.DESCRIPTION);
+      } else {
+        const video = document.getElementById('camera-feed');
+        const objs = await DetectorModule.detect(video);
+        const r = DetectorModule.processForSpeech(objs, 'detailed');
+        UIModule.addQA(question, r.description || 'I can detect objects but need the AI for specific questions.');
+        SpeechModule.speak(r.description || r.summary, SpeechModule.PRIORITY.DESCRIPTION);
+      }
     }
   });
 
