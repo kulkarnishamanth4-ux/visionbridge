@@ -48,8 +48,8 @@ function isRetryable(err) {
  * Per-model: up to MAX_RETRIES attempts. Falls through to next model on exhaustion.
  */
 async function callWithFallback(client, requestConfig) {
-  const MAX_RETRIES = 1;
-  const BASE_DELAY_MS = 500;  // 500ms only
+  const MAX_RETRIES = 2;
+  const BASE_DELAY_MS = 600;
   let lastErr;
 
   for (const model of MODELS) {
@@ -468,7 +468,7 @@ app.post('/api/measure', async (req, res) => {
 
     const requestConfig = {
       contents: [{ role: 'user', parts }],
-      config: { systemInstruction: instruction, temperature: 0.2, maxOutputTokens: 512 }
+      config: { systemInstruction: instruction, temperature: 0.2, maxOutputTokens: 800 }
     };
 
     const response = await callWithFallback(client, requestConfig);

@@ -799,14 +799,14 @@
         if (frame) {
           geminiResult = await Promise.race([
             ApiModule.analyzeScene(frame, currentMode, SpeechModule.getLanguage()),
-            new Promise(r => setTimeout(() => r(null), 10000))
+            new Promise(r => setTimeout(() => r(null), 15000))
           ]);
           P.recordAPI(!!geminiResult && !geminiResult._cached);
         }
       } catch { P.recordAPI(false); }
     }
 
-    const hasGemini = geminiResult?.description && !geminiResult._cached && !geminiResult.description.includes('AI service');
+    const hasGemini = geminiResult?.description && !geminiResult.description.includes('AI service');
 
     // OFFLINE FALLBACK: Use OfflineModule when Gemini is unavailable
     // This generates natural descriptions from local COCO-SSD detections
@@ -866,11 +866,45 @@
 
   // --- Measure Scan ---
   async function performMeasureScan(video) {
+    SpeechModule.speak('Measuring objects. Hold steady...', SpeechModule.PRIORITY.INFO);
+
+    // Try Gemini API first for accurate measurements
+    if (geminiAvailable) {
+      try {
+        const frame1 = CameraModule.captureFrame();
+        if (frame1) {
+          // Take second frame after 1 second for motion detection
+          await new Promise(r => setTimeout(r, 1000));
+          const frame2 = CameraModule.captureFrame();
+
+          const geminiMeasure = await Promise.race([
+            ApiModule.measureScene(frame1, frame2),
+            new Promise(r => setTimeout(() => r(null), 15000))
+          ]);
+
+          if (geminiMeasure?.objects?.length) {
+            const html = geminiMeasure.objects.map(obj => {
+              const motion = obj.moving ? `Moving ${obj.direction || ''} at ${obj.speed}` : 'Stationary';
+              const cls = obj.moving ? 'measure-moving' : 'measure-stationary';
+              return `<li class="measure-object"><div class="measure-name">${obj.name}</div>
+                <div class="measure-details"><span class="measure-detail-label">Size:</span><span>${obj.size}</span>
+                <span class="measure-detail-label">Distance:</span><span>${obj.distance}</span>
+                <span class="measure-detail-label">Motion:</span><span class="${cls}">${motion}</span></div></li>`;
+            }).join('');
+            UIModule.addDescription(`<ul class="measure-objects">${html}</ul>`, true);
+            lastDescription = geminiMeasure.summary || geminiMeasure.objects.map(o => `${o.name}: ${o.distance}, ${o.moving ? o.speed : 'stationary'}`).join('. ');
+            SpeechModule.speak(lastDescription, SpeechModule.PRIORITY.DESCRIPTION);
+            return;
+          }
+        }
+      } catch { /* fall through to local detector */ }
+    }
+
+    // Fallback: local detector
     if (!localDetectorReady) {
       SpeechModule.speak('Detection model loading. Please wait.', SpeechModule.PRIORITY.INFO);
       isProcessing = false; return;
     }
-    SpeechModule.speak('Measuring. Hold steady...', SpeechModule.PRIORITY.INFO);
     await DetectorModule.detect(video);
     await new Promise(r => setTimeout(r, 1000));
     const objects = await DetectorModule.detect(video);
@@ -1016,7 +1050,7 @@
       if (!frame) return;
       const result = await Promise.race([
         ApiModule.analyzeScene(frame, currentMode, SpeechModule.getLanguage()),
-        new Promise(r => setTimeout(() => r(null), 8000))
+        new Promise(r => setTimeout(() => r(null), 12000))
       ]);
       P.recordAPI(!!result && !result._cached);
 

@@ -16,7 +16,7 @@ const ApiModule = (() => {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+        const timeout = setTimeout(() => controller.abort(), 18000); // 18s timeout — Gemini needs time for rich descriptions
 
         const res = await fetch(url, { ...options, signal: controller.signal });
         clearTimeout(timeout);

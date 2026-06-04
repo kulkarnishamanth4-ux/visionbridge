@@ -9,9 +9,9 @@ const CameraModule = (() => {
   const canvas = document.getElementById('capture-canvas');
   const ctx = canvas.getContext('2d');
 
-  // Smaller images = faster API calls = fewer timeouts
-  const MAX_DIM = 384;
-  const JPEG_QUALITY = 0.35;
+  // Balance between image quality (AI needs detail) and payload size (API speed)
+  const MAX_DIM = 512;
+  const JPEG_QUALITY = 0.55;
 
   async function startCamera() {
     try {
