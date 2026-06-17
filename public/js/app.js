@@ -611,25 +611,46 @@
   });
 
   // --- Wake Word & Transcript → AI Assistant ---
+  let wakeAutoScanTimer = null;
+  let preWakeFrame = null;
+
   SpeechModule.onWakeWord(() => {
     SpeechModule.stopSpeaking();
-    SpeechModule.speak("I'm listening.", SpeechModule.PRIORITY.DESCRIPTION);
+    // No TTS "I'm listening" — the wake beep (played in speech.js) is the instant cue
     UIModule.setMode('listening'); UIModule.setListenActive(true);
+
+    // Pre-capture a frame NOW for faster response when command arrives
+    preWakeFrame = CameraModule.captureFrame();
+
+    // Auto-scan after 3 seconds of silence (user said wake word but no follow-up)
+    clearTimeout(wakeAutoScanTimer);
+    wakeAutoScanTimer = setTimeout(() => {
+      wakeAutoScanTimer = null;
+      preWakeFrame = null;
+      UIModule.setListenActive(false);
+      if (!isProcessing) performScan();
+    }, 3000);
   });
 
   SpeechModule.onTranscript(async (question) => {
+    // Cancel auto-scan timer — user is speaking a command
+    clearTimeout(wakeAutoScanTimer);
+    wakeAutoScanTimer = null;
+
     UIModule.setListenActive(false); UIModule.setMode('scanning');
 
     // Route everything through the AI Assistant
     if (typeof AssistantModule !== 'undefined') {
       const result = await AssistantModule.processCommand(question, {
-        getFrame: () => CameraModule.captureFrame(),
+        getFrame: () => preWakeFrame || CameraModule.captureFrame(),
         geminiAvailable,
         detectObjects: true
       });
+      preWakeFrame = null; // consumed
 
       if (result.response === null) {
         // Command handled silently (e.g., "stop")
+        UIModule.setMode(autoScanEnabled ? 'scanning' : 'idle');
         return;
       }
 
@@ -639,6 +660,7 @@
         AssistantModule.setLastDescription(result.response);
       }
     } else {
+      preWakeFrame = null;
       // Fallback: original behavior if AssistantModule not loaded
       if (question.toLowerCase().includes('help') || question.toLowerCase().includes('emergency')) {
         F.EmergencySOS.triggerSOS('Voice SOS: "' + question + '"');
@@ -663,7 +685,11 @@
   });
 
   SpeechModule.onSpeakStart(() => { if (!UIModule.els.statusRing.classList.contains('danger')) UIModule.setMode('speaking'); });
-  SpeechModule.onSpeakEnd(() => { if (!isProcessing) UIModule.setMode(autoScanEnabled ? 'scanning' : 'idle'); });
+  SpeechModule.onSpeakEnd(() => {
+    if (!isProcessing) UIModule.setMode(autoScanEnabled ? 'scanning' : 'idle');
+    // Soft ready beep after finishing speech — tells the user the system is listening again
+    setTimeout(() => SpeechModule.playReadyBeep(), 300);
+  });
 
   // ==========================================
   //   CORE SCAN — ALL FEATURES INTEGRATED

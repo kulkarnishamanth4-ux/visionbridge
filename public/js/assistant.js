@@ -22,7 +22,8 @@ const AssistantModule = (() => {
   const LOCAL_COMMANDS = [
     // --- TIME & DATE ---
     {
-      patterns: [/what(?:'s| is) the time/, /tell me the time/, /current time/, /what time/],
+      patterns: [/what(?:'s| is) the time/, /tell me the time/, /current time/, /what time/,
+        /samay kya hai/, /kitne baje/, /samaya yeshtu/, /time batao/],
       handler: () => {
         const now = new Date();
         const h = now.getHours(), m = now.getMinutes();
@@ -33,7 +34,8 @@ const AssistantModule = (() => {
       }
     },
     {
-      patterns: [/what(?:'s| is) the date/, /today(?:'s| is)? date/, /what date/, /what day/],
+      patterns: [/what(?:'s| is) the date/, /today(?:'s| is)? date/, /what date/, /what day/,
+        /aaj kya date/, /aaj kaunsa din/, /indu yenu date/],
       handler: () => {
         const now = new Date();
         const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
@@ -53,35 +55,35 @@ const AssistantModule = (() => {
 
     // --- MODE SWITCHING ---
     {
-      patterns: [/switch to danger|danger mode|enable danger/],
+      patterns: [/switch to danger|danger mode|enable danger|khatarnak mode|danger heli/],
       handler: () => {
         document.querySelector('[data-mode="danger"]')?.click();
         return 'Switched to danger detection mode. I will focus on alerting you about hazards.';
       }
     },
     {
-      patterns: [/switch to summary|summary mode|enable summary/],
+      patterns: [/switch to summary|summary mode|enable summary|brief mode|short mode|chhota mode/],
       handler: () => {
         document.querySelector('[data-mode="summary"]')?.click();
         return 'Switched to summary mode. I will give you brief descriptions.';
       }
     },
     {
-      patterns: [/switch to detailed|detailed mode|full description|enable detailed/],
+      patterns: [/switch to detailed|detailed mode|full description|enable detailed|poora batao|vistaravaagi heli/],
       handler: () => {
         document.querySelector('[data-mode="detailed"]')?.click();
         return 'Switched to detailed mode. I will describe everything I see in detail.';
       }
     },
     {
-      patterns: [/switch to read|read mode|text mode|ocr mode/],
+      patterns: [/switch to read|read mode|text mode|ocr mode|read this|what does it say|what is written|read that sign|padho|ye padho|kya likha|odi|yenu baredide/],
       handler: () => {
         document.querySelector('[data-mode="read"]')?.click();
         return 'Switched to reading mode. Point me at any text and I will read it for you.';
       }
     },
     {
-      patterns: [/switch to measure|measure mode|distance mode/],
+      patterns: [/switch to measure|measure mode|distance mode|how far is|how big is|kitna door|kitna bada|naap lo|yeshtu doora|yeshtu dodda/],
       handler: () => {
         document.querySelector('[data-mode="measure"]')?.click();
         return 'Switched to measure mode. I will estimate distances to objects around you.';
@@ -90,7 +92,7 @@ const AssistantModule = (() => {
 
     // --- REPEAT / STOP ---
     {
-      patterns: [/repeat|say (?:that |it )?again|what did you say|last description/],
+      patterns: [/repeat|say (?:that |it )?again|what did you say|last description|come again|once more|phir se bolo|dobara bolo|matte heli|innondu saari/],
       handler: () => {
         if (lastDescription) return lastDescription;
         const outputBody = document.getElementById('output-body');
@@ -99,7 +101,7 @@ const AssistantModule = (() => {
       }
     },
     {
-      patterns: [/^stop$|^quiet$|shut up|be quiet|stop talking|stop speaking/],
+      patterns: [/^stop$|^quiet$|shut up|be quiet|stop talking|stop speaking|^bas$|^ruko$|^chup$|band karo|nilsi|saku maadi|^saku$/],
       handler: () => {
         if (typeof SpeechModule !== 'undefined') SpeechModule.stopSpeaking();
         return null; // Don't speak a response to "stop"
@@ -108,7 +110,7 @@ const AssistantModule = (() => {
 
     // --- SCAN ---
     {
-      patterns: [/scan now|scan again|take a scan|look around|what do you see/],
+      patterns: [/scan now|scan again|take a scan|look around|what do you see|what's there|what's around|what's in front|what's ahead|describe|tell me what you see|check around|look for me|what is this|what is that|describe the scene|describe what you see|dekho|dekhiye|kya hai|batao|samne kya hai|dikhao|nodi|nodri|yenu ide|heli|torsri/],
       handler: () => {
         document.getElementById('btn-scan')?.click();
         return 'Scanning now...';
@@ -182,7 +184,7 @@ const AssistantModule = (() => {
 
     // --- LOCATION ---
     {
-      patterns: [/where am i|my location|current location|gps/],
+      patterns: [/where am i|my location|current location|gps|kahan hun|kahan hai|naanu yelli/],
       handler: () => {
         if (!navigator.geolocation) return 'Location services are not available on this device.';
         navigator.geolocation.getCurrentPosition(
@@ -206,7 +208,7 @@ const AssistantModule = (() => {
 
     // --- SOS ---
     {
-      patterns: [/trigger sos|send sos|emergency|i need help|call for help/],
+      patterns: [/trigger sos|send sos|emergency|i need help|call for help|help me|i'?m in danger|i'?m lost|save me|please help|somebody help|bachao|madad|madad karo|mujhe bachao|koi hai|sahaya|sahaya maadi|ulisi|kapadri/],
       handler: () => {
         if (typeof FeaturesModule !== 'undefined') {
           FeaturesModule.EmergencySOS.triggerSOS('Voice command: Emergency assistance requested');
@@ -253,10 +255,45 @@ const AssistantModule = (() => {
       handler: () => {
         const outputBody = document.getElementById('output-body');
         const last = outputBody?.textContent || '';
-        // Try to extract object count from last description
         const numMatch = last.match(/(\d+)\s+(?:objects?|people|persons?|items?)/i);
         if (numMatch) return `I detected ${numMatch[1]} ${numMatch[0].replace(numMatch[1], '').trim()} in the last scan.`;
         return 'I need to scan first. Say "scan now" and then ask me again.';
+      }
+    },
+
+    // --- AUTO / CONTINUOUS SCAN ---
+    {
+      patterns: [/start continuous|continuous mode|keep scanning|auto mode|auto scan|start auto|chalte raho|scanning chalu/],
+      handler: () => {
+        const btn = document.getElementById('btn-auto');
+        if (btn && !btn.classList.contains('active')) btn.click();
+        return 'Continuous scanning activated. I will keep watching for you.';
+      }
+    },
+    {
+      patterns: [/stop continuous|stop auto|stop scanning|disable auto|scanning band/],
+      handler: () => {
+        const btn = document.getElementById('btn-auto');
+        if (btn && btn.classList.contains('active')) btn.click();
+        return 'Continuous scanning stopped.';
+      }
+    },
+
+    // --- BOOKMARK ---
+    {
+      patterns: [/bookmark|save this|remember this|yaad rakho|note karo/],
+      handler: () => {
+        document.getElementById('btn-bookmark')?.click();
+        return 'Bookmarked.';
+      }
+    },
+
+    // --- SHARE ---
+    {
+      patterns: [/share this|share scan|send this|share karo/],
+      handler: () => {
+        document.getElementById('btn-share')?.click();
+        return 'Sharing...';
       }
     }
   ];
@@ -314,6 +351,41 @@ const AssistantModule = (() => {
 
     for (const kw of followupKeywords) {
       if (kw.test(lower)) return { type: 'followup' };
+    }
+
+    // Short utterance fuzzy match: if 1-4 words, try Levenshtein against command keywords
+    if (typeof SpeechModule !== 'undefined' && SpeechModule.levenshtein) {
+      const cmdKeywords = [
+        { word: 'scan', type: 'local', idx: 'scan' },
+        { word: 'describe', type: 'scene', idx: null },
+        { word: 'measure', type: 'local', idx: 'measure' },
+        { word: 'read', type: 'local', idx: 'read' },
+        { word: 'stop', type: 'local', idx: 'stop' },
+        { word: 'repeat', type: 'local', idx: 'repeat' },
+        { word: 'emergency', type: 'local', idx: 'sos' },
+        { word: 'help', type: 'local', idx: 'help' },
+        { word: 'time', type: 'local', idx: 'time' },
+        { word: 'battery', type: 'local', idx: 'battery' },
+        { word: 'bookmark', type: 'local', idx: 'bookmark' }
+      ];
+      const lowerWords = lower.split(/\s+/);
+      for (const tw of lowerWords) {
+        if (tw.length < 3) continue;
+        for (const kw of cmdKeywords) {
+          const dist = SpeechModule.levenshtein(tw, kw.word);
+          if (dist <= Math.ceil(kw.word.length * 0.3)) {
+            // Found a fuzzy match — find the actual command
+            if (kw.type === 'scene') return { type: 'scene' };
+            for (const cmd of LOCAL_COMMANDS) {
+              for (const p of cmd.patterns) {
+                if (p.source.includes(kw.word)) {
+                  return { type: 'local', command: cmd, match: [lower] };
+                }
+              }
+            }
+          }
+        }
+      }
     }
 
     // Everything else → general knowledge question

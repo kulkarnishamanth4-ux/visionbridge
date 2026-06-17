@@ -85,7 +85,7 @@ const SpeechModule = (() => {
     recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = false;
-    recognition.lang = 'en-US';
+    recognition.lang = 'en-IN';
 
     recognition.onresult = (event) => {
       const last = event.results[event.results.length - 1];
@@ -103,11 +103,12 @@ const SpeechModule = (() => {
       } else if (matchesWakeWord(transcript)) {
         // Wake word detected
         console.log('[Speech] Wake word detected!');
+        playWakeBeep();
         awaitingQuestion = true;
         if (onWakeWordCallback) onWakeWordCallback();
 
-        // Auto-reset after 15 seconds if no question received
-        setTimeout(() => { awaitingQuestion = false; }, 15000);
+        // Auto-reset after 20 seconds if no question received
+        setTimeout(() => { awaitingQuestion = false; }, 20000);
       }
     };
 
@@ -124,27 +125,60 @@ const SpeechModule = (() => {
       if (isListening && recognitionSupported) {
         setTimeout(() => {
           try { recognition.start(); } catch (e) { /* already started */ }
-        }, 300); // Small delay prevents rapid restart loops
+        }, 100); // Minimal delay for responsive voice control
       }
     };
 
     return true;
   }
 
-  // Flexible wake word matching: handles partial recognition and common misheard variants
-  function matchesWakeWord(transcript) {
-    if (transcript.includes(wakeWord)) return true;
-    // Handle common misheard variants
-    const words = wakeWord.split(' ');
-    if (words.length >= 2) {
-      // Match if at least 2 words appear close together
-      const allPresent = words.every(w => transcript.includes(w));
-      if (allPresent) return true;
+  // Levenshtein edit distance for fuzzy matching
+  function levenshtein(a, b) {
+    const m = a.length, n = b.length;
+    if (m === 0) return n;
+    if (n === 0) return m;
+    const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+    for (let i = 0; i <= m; i++) dp[i][0] = i;
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
+    for (let i = 1; i <= m; i++) {
+      for (let j = 1; j <= n; j++) {
+        dp[i][j] = a[i - 1] === b[j - 1]
+          ? dp[i - 1][j - 1]
+          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+      }
     }
-    // Fuzzy: "hey vision" can be heard as "a vision", "hey visions", etc.
-    const fuzzy = wakeWord.replace(/\s+/g, '').toLowerCase();
-    const tClean = transcript.replace(/\s+/g, '').toLowerCase();
-    if (tClean.includes(fuzzy)) return true;
+    return dp[m][n];
+  }
+
+  // Accent-robust wake word matching with Levenshtein fuzzy tolerance
+  function matchesWakeWord(transcript) {
+    // Direct substring match
+    if (transcript.includes(wakeWord)) return true;
+
+    // All individual words present anywhere in transcript
+    const words = wakeWord.split(' ');
+    if (words.length >= 2 && words.every(w => transcript.includes(w))) return true;
+
+    // Concatenated form match ("heyvision" in "iheardheyvision")
+    const concat = wakeWord.replace(/\s+/g, '');
+    const tClean = transcript.replace(/\s+/g, '');
+    if (tClean.includes(concat)) return true;
+
+    // Levenshtein fuzzy: slide a window across transcript words
+    const tWords = transcript.split(/\s+/);
+    const wLen = words.length;
+    for (let i = 0; i <= tWords.length - wLen; i++) {
+      const segment = tWords.slice(i, i + wLen).join(' ');
+      const dist = levenshtein(segment, wakeWord);
+      const maxLen = Math.max(segment.length, wakeWord.length);
+      if (dist <= Math.ceil(maxLen * 0.35)) return true;
+    }
+    // Single-word wake words: check each transcript word individually
+    if (wLen === 1) {
+      for (const tw of tWords) {
+        if (levenshtein(tw, wakeWord) <= Math.ceil(wakeWord.length * 0.35)) return true;
+      }
+    }
     return false;
   }
 
@@ -184,7 +218,7 @@ const SpeechModule = (() => {
       const tempRec = new SpeechRecognition();
       tempRec.continuous = false;
       tempRec.interimResults = false;
-      tempRec.lang = 'en-US';
+      tempRec.lang = 'en-IN';
       let settled = false;
 
       const timer = setTimeout(() => {
@@ -466,12 +500,46 @@ const SpeechModule = (() => {
     return isSpeaking || synth.speaking;
   }
 
+  /** Rising tone beep — plays instantly when wake word is detected */
+  function playWakeBeep() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+    osc.frequency.linearRampToValueAtTime(880, audioCtx.currentTime + 0.15);
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+    gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.2);
+    osc.start(audioCtx.currentTime);
+    osc.stop(audioCtx.currentTime + 0.2);
+  }
+
+  /** Soft ready beep — plays after a command is completed */
+  function playReadyBeep() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.frequency.value = 660;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+    gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.1);
+    osc.start(audioCtx.currentTime);
+    osc.stop(audioCtx.currentTime + 0.12);
+  }
+
   return {
     initRecognition, startListening, stopListening,
     triggerQuestionMode, listenOnce, matchesWakeWord,
     initSynthesis, loadVoices,
     speak, stopSpeaking, isSpeakingNow,
-    unlockAudio, playDangerBeep,
+    unlockAudio, playDangerBeep, playWakeBeep, playReadyBeep,
+    levenshtein,
     setWakeWord, setVoice, setRate, setLanguage,
     onWakeWord, onTranscript, onSpeakStart, onSpeakEnd,
     getLanguage() { return currentLang; },
