@@ -421,44 +421,67 @@
         return;
       }
 
-      // ---- PHONE: Place a call using anchor click (more reliable auto-dial) ----
+      // ---- MULTI-CHANNEL SOS: fire all available channels ----
+      locEl.textContent = locText + ' \u2014 Sending SOS alerts...';
+
+      // For phone contacts: also trigger tel: link as immediate dialer fallback
       if (contactType === 'phone') {
-        locEl.textContent = locText + ' \u2014 Calling ' + contact + '...';
-        SpeechModule.speak('Calling your emergency contact now.', SpeechModule.PRIORITY.DANGER);
-        // Create a hidden anchor and click it — this triggers the system call intent
-        // more reliably than window.location.href on Android Chrome
         const callLink = document.createElement('a');
         callLink.href = 'tel:' + contact.replace(/\s/g, '');
         callLink.style.display = 'none';
         document.body.appendChild(callLink);
         callLink.click();
         setTimeout(() => callLink.remove(), 1000);
-        return;
       }
 
-      // ---- EMAIL: Send via server (fully automated, zero interaction) ----
-      locEl.textContent = locText + ' \u2014 Sending SOS email...';
+      // Send to server for automated channels (email / Twilio call / Twilio SMS)
       try {
         const response = await fetch('/api/sos', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contact,
+            contactType,
             reason,
             location: loc ? { lat: loc.lat, lng: loc.lng } : null
           })
         });
         const result = await response.json();
+
         if (result.success) {
-          locEl.textContent = locText + ' \u2014 SOS email sent to ' + contact + '!';
-          SpeechModule.speak('SOS email sent successfully to ' + contact, SpeechModule.PRIORITY.DANGER);
+          const summary = result.summary || 'SOS sent!';
+          locEl.textContent = locText + ' \u2014 \u2705 ' + summary;
+          SpeechModule.speak(summary, SpeechModule.PRIORITY.DANGER);
+
+          // Show channel details
+          if (result.channels) {
+            const details = [];
+            if (result.channels.call?.success) details.push('Phone call placed');
+            if (result.channels.sms?.success) details.push('SMS delivered');
+            if (result.channels.email?.success) details.push('Email sent');
+            if (details.length > 1) {
+              SpeechModule.speak(details.join('. ') + '.', SpeechModule.PRIORITY.INFO);
+            }
+          }
         } else {
-          locEl.textContent = locText + ' \u2014 Failed: ' + (result.error || 'Unknown error');
-          SpeechModule.speak('Failed to send SOS. ' + (result.error || ''), SpeechModule.PRIORITY.DANGER);
+          // Server channels failed — but tel: link may have opened the dialer
+          if (contactType === 'phone') {
+            locEl.textContent = locText + ' \u2014 Dialer opened. Server: ' + (result.error || 'failed');
+            SpeechModule.speak('Opening your phone dialer. Server alert failed: ' + (result.error || ''), SpeechModule.PRIORITY.DANGER);
+          } else {
+            locEl.textContent = locText + ' \u2014 Failed: ' + (result.error || 'Unknown error');
+            SpeechModule.speak('Failed to send SOS. ' + (result.error || ''), SpeechModule.PRIORITY.DANGER);
+          }
         }
       } catch {
-        locEl.textContent = locText + ' \u2014 Network error';
-        SpeechModule.speak('Network error. Could not send SOS email.', SpeechModule.PRIORITY.DANGER);
+        // Network error — tel: link is the only fallback
+        if (contactType === 'phone') {
+          locEl.textContent = locText + ' \u2014 Network error. Dialer opened as fallback.';
+          SpeechModule.speak('Network error. Opening phone dialer as emergency fallback.', SpeechModule.PRIORITY.DANGER);
+        } else {
+          locEl.textContent = locText + ' \u2014 Network error';
+          SpeechModule.speak('Network error. Could not send SOS.', SpeechModule.PRIORITY.DANGER);
+        }
       }
     };
 

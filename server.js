@@ -5,7 +5,7 @@ const compression = require('compression');
 const { GoogleGenAI } = require('@google/genai');
 const path = require('path');
 const os = require('os');
-const nodemailer = require('nodemailer');
+const nodemailer = require('nodemailer');\nconst twilio = require('twilio');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -1039,44 +1039,201 @@ app.post('/api/verify-otp', (req, res) => {
 });
 
 // =============================================
-//   SOS EMERGENCY ENDPOINT
+//   MULTI-CHANNEL SOS EMERGENCY SYSTEM
+//   Channels: Email + Twilio Voice Call + SMS
+//   Each channel fires independently — partial
+//   failures don't block other channels.
 // =============================================
+
+// Twilio client (initialized only if configured)
+let twilioClient = null;
+const TWILIO_SID = process.env.TWILIO_ACCOUNT_SID;
+const TWILIO_AUTH = process.env.TWILIO_AUTH_TOKEN;
+const TWILIO_FROM = process.env.TWILIO_PHONE_NUMBER;
+if (TWILIO_SID && TWILIO_AUTH && TWILIO_FROM) {
+  twilioClient = twilio(TWILIO_SID, TWILIO_AUTH);
+  console.log('[SOS] Twilio configured — voice call + SMS enabled');
+} else {
+  console.log('[SOS] Twilio not configured — email-only mode (set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER to enable)');
+}
+
+// Store last SOS data for the TwiML voice endpoint
+let lastSOSData = { reason: '', location: '', mapsLink: '', time: '' };
+
+// TwiML voice endpoint — Twilio fetches this when the call connects
+app.post('/api/sos-voice', (req, res) => {
+  const VoiceResponse = twilio.twiml.VoiceResponse;
+  const twiml = new VoiceResponse();
+
+  // Pause briefly, then deliver the emergency message clearly
+  twiml.pause({ length: 1 });
+  twiml.say({ voice: 'Polly.Aditi', language: 'en-IN' },
+    'Emergency alert from Vision Bridge. ' +
+    (lastSOSData.reason || 'A user has triggered an SOS.') + '. ' +
+    (lastSOSData.location || 'Location is not available.') + '. ' +
+    'Time of alert: ' + (lastSOSData.time || 'unknown') + '. ' +
+    'Please respond immediately. This is an automated emergency call.'
+  );
+  // Repeat the message once for clarity
+  twiml.pause({ length: 2 });
+  twiml.say({ voice: 'Polly.Aditi', language: 'en-IN' },
+    'Repeating: Emergency alert. ' +
+    (lastSOSData.location || '') + '. ' +
+    'Please check your SMS or email for the Google Maps location link.'
+  );
+
+  res.type('text/xml');
+  res.send(twiml.toString());
+});
+
+// Main SOS endpoint — fires all configured channels simultaneously
 app.post('/api/sos', async (req, res) => {
   try {
-    const { contact, reason, location } = req.body;
+    const { contact, reason, location, contactType } = req.body;
     if (!contact) {
       return res.json({ success: false, error: 'No emergency contact provided.' });
     }
 
+    // Build location data
     let mapsLink = '';
     let locText = 'Location unavailable';
     if (location && location.lat && location.lng) {
       mapsLink = `https://maps.google.com/?q=${location.lat},${location.lng}`;
       locText = `Lat: ${location.lat}, Lng: ${location.lng}`;
     }
+    const timeStr = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
 
-    const subject = 'EMERGENCY SOS - VisionBridge Alert';
-    const htmlBody = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;border:3px solid #e74c3c;border-radius:12px;"><h1 style="color:#e74c3c;text-align:center;">\u{1F6A8} EMERGENCY SOS</h1><p style="font-size:18px;">A VisionBridge user needs immediate help.</p><hr style="border:1px solid #eee;"><p><strong>Reason:</strong> ${reason || 'Manual SOS'}</p><p><strong>Location:</strong> ${locText}</p>${mapsLink ? `<p><a href="${mapsLink}" style="display:inline-block;padding:12px 24px;background:#e74c3c;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;">\u{1F4CD} Open in Google Maps</a></p>` : ''}<p><strong>Time:</strong> ${new Date().toLocaleString()}</p><hr style="border:1px solid #eee;"><p style="color:#888;font-size:12px;">Automated alert from VisionBridge.</p></div>`;
-    const textBody = `EMERGENCY SOS\nReason: ${reason || 'Manual SOS'}\nLocation: ${locText}\n${mapsLink ? 'Maps: ' + mapsLink : ''}\nTime: ${new Date().toLocaleString()}`;
+    // Store for TwiML endpoint
+    lastSOSData = { reason: reason || 'Manual SOS', location: locText, mapsLink, time: timeStr };
 
-    const transporter = getTransporter();
-    if (!transporter) {
-      return res.json({ success: false, error: 'Email not configured. Set SOS_EMAIL_USER and SOS_EMAIL_PASS in Render.', notConfigured: true });
-    }
+    // Track results for each channel
+    const results = { email: null, call: null, sms: null };
 
-    await transporter.sendMail({
-      from: `"VisionBridge SOS" <${process.env.SOS_EMAIL_USER}>`,
-      to: contact,
-      subject,
-      text: textBody,
-      html: htmlBody,
-      priority: 'high'
+    // --- CHANNEL 1: EMAIL (always attempted if transporter exists) ---
+    const emailPromise = (async () => {
+      const isEmail = contactType === 'email' || contact.includes('@');
+      if (!isEmail) return null;
+
+      const transporter = getTransporter();
+      if (!transporter) return { success: false, error: 'Email not configured' };
+
+      const subject = '🚨 EMERGENCY SOS - VisionBridge Alert';
+      const htmlBody = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;border:3px solid #e74c3c;border-radius:12px;">
+        <h1 style="color:#e74c3c;text-align:center;">🚨 EMERGENCY SOS</h1>
+        <p style="font-size:18px;">A VisionBridge user needs immediate help.</p>
+        <hr style="border:1px solid #eee;">
+        <p><strong>Reason:</strong> ${reason || 'Manual SOS'}</p>
+        <p><strong>Location:</strong> ${locText}</p>
+        ${mapsLink ? `<p><a href="${mapsLink}" style="display:inline-block;padding:12px 24px;background:#e74c3c;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;">📍 Open in Google Maps</a></p>` : ''}
+        <p><strong>Time:</strong> ${timeStr}</p>
+        <hr style="border:1px solid #eee;">
+        <p style="color:#888;font-size:12px;">Automated alert from VisionBridge Emergency System.</p>
+      </div>`;
+      const textBody = `EMERGENCY SOS\nReason: ${reason || 'Manual SOS'}\nLocation: ${locText}\n${mapsLink ? 'Maps: ' + mapsLink : ''}\nTime: ${timeStr}`;
+
+      try {
+        await transporter.sendMail({
+          from: `"VisionBridge SOS" <${process.env.SOS_EMAIL_USER}>`,
+          to: contact,
+          subject,
+          text: textBody,
+          html: htmlBody,
+          priority: 'high'
+        });
+        console.log(`[SOS] ✅ Email sent to ${contact}`);
+        return { success: true };
+      } catch (err) {
+        console.error(`[SOS] ❌ Email failed:`, err.message);
+        return { success: false, error: err.message };
+      }
+    })();
+
+    // --- CHANNEL 2: TWILIO VOICE CALL (if configured + phone contact) ---
+    const callPromise = (async () => {
+      const isPhone = contactType === 'phone' || /^\+?\d{10,15}$/.test(contact.replace(/[\s-]/g, ''));
+      if (!isPhone || !twilioClient) return null;
+
+      const phoneNumber = contact.replace(/[\s-]/g, '');
+      const toNumber = phoneNumber.startsWith('+') ? phoneNumber : '+91' + phoneNumber;
+
+      // Build the TwiML URL — use the server's own URL
+      const protocol = req.get('x-forwarded-proto') || req.protocol;
+      const host = req.get('host');
+      const twimlUrl = `${protocol}://${host}/api/sos-voice`;
+
+      try {
+        const call = await twilioClient.calls.create({
+          url: twimlUrl,
+          to: toNumber,
+          from: TWILIO_FROM,
+          timeout: 30
+        });
+        console.log(`[SOS] ✅ Voice call initiated to ${toNumber} (SID: ${call.sid})`);
+        return { success: true, callSid: call.sid };
+      } catch (err) {
+        console.error(`[SOS] ❌ Voice call failed:`, err.message);
+        return { success: false, error: err.message };
+      }
+    })();
+
+    // --- CHANNEL 3: TWILIO SMS (if configured + phone contact) ---
+    const smsPromise = (async () => {
+      const isPhone = contactType === 'phone' || /^\+?\d{10,15}$/.test(contact.replace(/[\s-]/g, ''));
+      if (!isPhone || !twilioClient) return null;
+
+      const phoneNumber = contact.replace(/[\s-]/g, '');
+      const toNumber = phoneNumber.startsWith('+') ? phoneNumber : '+91' + phoneNumber;
+
+      const smsBody = `🚨 VISIONBRIDGE SOS 🚨\n` +
+        `Reason: ${reason || 'Emergency'}\n` +
+        `Location: ${locText}\n` +
+        `${mapsLink ? '📍 Maps: ' + mapsLink : ''}\n` +
+        `Time: ${timeStr}\n` +
+        `Reply or call back immediately.`;
+
+      try {
+        const msg = await twilioClient.messages.create({
+          body: smsBody,
+          to: toNumber,
+          from: TWILIO_FROM
+        });
+        console.log(`[SOS] ✅ SMS sent to ${toNumber} (SID: ${msg.sid})`);
+        return { success: true, msgSid: msg.sid };
+      } catch (err) {
+        console.error(`[SOS] ❌ SMS failed:`, err.message);
+        return { success: false, error: err.message };
+      }
+    })();
+
+    // Wait for all channels simultaneously (don't let one block others)
+    const [emailResult, callResult, smsResult] = await Promise.allSettled([
+      emailPromise, callPromise, smsPromise
+    ]);
+
+    results.email = emailResult.status === 'fulfilled' ? emailResult.value : { success: false, error: 'Promise rejected' };
+    results.call = callResult.status === 'fulfilled' ? callResult.value : { success: false, error: 'Promise rejected' };
+    results.sms = smsResult.status === 'fulfilled' ? smsResult.value : { success: false, error: 'Promise rejected' };
+
+    // At least one channel must succeed
+    const anySuccess = [results.email, results.call, results.sms].some(r => r && r.success);
+    const channelsSent = [
+      results.email?.success ? 'Email' : null,
+      results.call?.success ? 'Voice Call' : null,
+      results.sms?.success ? 'SMS' : null
+    ].filter(Boolean);
+
+    console.log(`[SOS] Channels fired: ${channelsSent.join(', ') || 'none'}`);
+
+    res.json({
+      success: anySuccess,
+      channels: results,
+      summary: channelsSent.length > 0
+        ? `SOS sent via: ${channelsSent.join(' + ')}`
+        : 'All channels failed. Check configuration.',
+      error: anySuccess ? null : 'All SOS channels failed.'
     });
-
-    console.log(`[SOS] Emergency email sent to ${contact}`);
-    res.json({ success: true });
   } catch (err) {
-    console.error('[SOS] Failed:', err.message);
+    console.error('[SOS] Critical error:', err.message);
     res.json({ success: false, error: err.message });
   }
 });
