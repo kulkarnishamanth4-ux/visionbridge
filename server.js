@@ -5,7 +5,8 @@ const compression = require('compression');
 const { GoogleGenAI } = require('@google/genai');
 const path = require('path');
 const os = require('os');
-const nodemailer = require('nodemailer');\nconst twilio = require('twilio');
+const nodemailer = require('nodemailer');
+const twilio = require('twilio');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
