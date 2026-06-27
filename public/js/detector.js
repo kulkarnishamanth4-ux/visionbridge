@@ -92,28 +92,64 @@ const DetectorModule = (() => {
 
   // =============================================
   //   DISTANCE ESTIMATION — Class-aware pinhole model
-  //   Uses known real-world heights to calculate distance
-  //   via: distance = (realHeight * imageHeight) / (bboxHeight * 2 * tan(VFOV/2))
+  // =============================================
+  //   DISTANCE ESTIMATION — Hybrid: pinhole + fill-based
+  //   Pinhole model is accurate in the mid-range (1-10m) but
+  //   breaks down at extremes:
+  //   - Too close: bbox overflows frame, bboxH ≈ canvasH
+  //   - Too far: bbox is tiny, noise dominates
+  //   Solution: blend with fill-based model at extremes.
   // =============================================
   function estimateDistance(objClass, bboxW, bboxH, canvasW, canvasH) {
+    // Guard against degenerate inputs
+    if (bboxH < 3 || canvasH < 10) return 5.0;
+
+    const fill = bboxH / canvasH;
     const knownH = KNOWN_HEIGHTS[objClass];
 
-    if (knownH) {
-      // Pinhole camera model: d = (H_real * f) / h_pixels
-      // where f (focal in pixels) = (canvasH / 2) / tan(VFOV / 2)
-      const focalPx = (canvasH / 2) / Math.tan(CAMERA_VFOV / 2);
-      const d = (knownH * focalPx) / bboxH;
-      // Clamp to reasonable range
-      return Math.max(0.3, Math.min(d, 30.0));
+    // Fill-based distance (always computed, used as anchor/blend)
+    let fillDist;
+    if (fill >= 0.90) fillDist = 0.2;
+    else if (fill >= 0.75) fillDist = 0.4;
+    else if (fill >= 0.60) fillDist = 0.7;
+    else if (fill >= 0.45) fillDist = 1.0;
+    else if (fill >= 0.30) fillDist = 1.8;
+    else if (fill >= 0.20) fillDist = 3.0;
+    else if (fill >= 0.12) fillDist = 5.0;
+    else if (fill >= 0.07) fillDist = 8.0;
+    else if (fill >= 0.04) fillDist = 12.0;
+    else if (fill >= 0.02) fillDist = 18.0;
+    else fillDist = 25.0;
+
+    if (!knownH) {
+      // No known height — use fill-based only
+      return Math.max(0.2, Math.min(fillDist, 25.0));
     }
 
-    // Fallback: frame-fill model with exponential interpolation
-    const fill = bboxH / canvasH;
-    if (fill <= 0) return 20.0;
-    // Exponential model: distance ≈ 1.2 * fill^(-0.85)
-    // Tuned so fill=0.8 → ~1.4m, fill=0.2 → ~5m, fill=0.05 → ~15m
-    const d = 1.2 * Math.pow(fill, -0.85);
-    return Math.max(0.3, Math.min(d, 25.0));
+    // Pinhole model: d = (H_real * f) / h_pixels
+    const focalPx = (canvasH / 2) / Math.tan(CAMERA_VFOV / 2);
+    let pinholeDist = (knownH * focalPx) / bboxH;
+
+    // Blend strategy:
+    //   fill > 0.7 (very close): trust fill-based more (pinhole overestimates closeness)
+    //   fill < 0.05 (very far): trust fill-based more (pinhole noise explodes)
+    //   0.05 < fill < 0.7 (mid-range): trust pinhole more (most accurate here)
+    let blendWeight; // 0 = pure fill, 1 = pure pinhole
+    if (fill > 0.70) {
+      // Very close: fade from pinhole to fill
+      blendWeight = Math.max(0, (0.85 - fill) / 0.15); // 0.85→1.0, 0.70→0.0
+    } else if (fill < 0.05) {
+      // Very far: fade from pinhole to fill
+      blendWeight = Math.max(0, fill / 0.05); // 0.05→1.0, 0→0.0
+    } else {
+      // Mid-range: trust pinhole fully
+      blendWeight = 1.0;
+    }
+
+    const blended = blendWeight * pinholeDist + (1 - blendWeight) * fillDist;
+
+    // Final clamp
+    return Math.max(0.2, Math.min(Math.round(blended * 10) / 10, 25.0));
   }
 
   function distanceLabel(m) {

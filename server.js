@@ -1082,7 +1082,8 @@ if (TWILIO_SID && TWILIO_AUTH && TWILIO_FROM) {
 let lastSOSData = { reason: '', location: '', mapsLink: '', time: '' };
 
 // TwiML voice endpoint — Twilio fetches this when the call connects
-app.post('/api/sos-voice', (req, res) => {
+// Accept both GET and POST (Twilio may use either depending on config)
+function handleSOSVoice(req, res) {
   const VoiceResponse = twilio.twiml.VoiceResponse;
   const twiml = new VoiceResponse();
 
@@ -1105,7 +1106,9 @@ app.post('/api/sos-voice', (req, res) => {
 
   res.type('text/xml');
   res.send(twiml.toString());
-});
+}
+app.get('/api/sos-voice', handleSOSVoice);
+app.post('/api/sos-voice', handleSOSVoice);
 
 // Main SOS endpoint — fires all configured channels simultaneously
 app.post('/api/sos', async (req, res) => {
@@ -1171,39 +1174,76 @@ app.post('/api/sos', async (req, res) => {
 
     // --- CHANNEL 2: TWILIO VOICE CALL (if configured + phone contact) ---
     const callPromise = (async () => {
-      const isPhone = contactType === 'phone' || /^\+?\d{10,15}$/.test(contact.replace(/[\s-]/g, ''));
-      if (!isPhone || !twilioClient) return null;
+      // Accept various Indian phone formats: 10 digits, 0-prefixed, +91, etc.
+      const cleaned = contact.replace(/[\s\-()]/g, '');
+      const isPhone = contactType === 'phone' || /^(\+?91|0)?\d{10}$/.test(cleaned) || /^\+?\d{10,15}$/.test(cleaned);
+      if (!isPhone || !twilioClient) {
+        console.log(`[SOS] Skipping Twilio call: isPhone=${isPhone}, twilioConfigured=${!!twilioClient}`);
+        return null;
+      }
 
-      const phoneNumber = contact.replace(/[\s-]/g, '');
-      const toNumber = phoneNumber.startsWith('+') ? phoneNumber : '+91' + phoneNumber;
+      // Normalize to E.164 format (+91XXXXXXXXXX)
+      let toNumber = cleaned;
+      if (toNumber.startsWith('0')) toNumber = toNumber.slice(1);
+      if (!toNumber.startsWith('+')) {
+        toNumber = toNumber.startsWith('91') && toNumber.length > 11
+          ? '+' + toNumber
+          : '+91' + toNumber;
+      }
+      console.log(`[SOS] Calling ${toNumber} via Twilio...`);
 
-      // Build the TwiML URL — use the server's own URL
+      // Build the TwiML URL — use the server's own public URL
       const protocol = req.get('x-forwarded-proto') || req.protocol;
       const host = req.get('host');
       const twimlUrl = `${protocol}://${host}/api/sos-voice`;
 
+      // Build inline TwiML as fallback (in case Twilio can't reach webhook)
+      const inlineTwiml = `<Response><Pause length="1"/><Say voice="Polly.Aditi" language="en-IN">Emergency alert from Vision Bridge. ${lastSOSData.reason || 'SOS activated'}. ${lastSOSData.location || 'Location unavailable'}. Time: ${lastSOSData.time || 'unknown'}. Please respond immediately.</Say><Pause length="2"/><Say voice="Polly.Aditi" language="en-IN">Repeating: Emergency alert. Please check your SMS for the location link.</Say></Response>`;
+
       try {
+        // Try with webhook URL first
         const call = await twilioClient.calls.create({
           url: twimlUrl,
           to: toNumber,
           from: TWILIO_FROM,
-          timeout: 30
+          timeout: 30,
+          statusCallback: twimlUrl.replace('sos-voice', 'sos-call-status'),
         });
         console.log(`[SOS] ✅ Voice call initiated to ${toNumber} (SID: ${call.sid})`);
         return { success: true, callSid: call.sid };
       } catch (err) {
-        console.error(`[SOS] ❌ Voice call failed:`, err.message);
-        return { success: false, error: err.message };
+        console.error(`[SOS] ❌ Voice call via URL failed: ${err.message}, trying inline TwiML...`);
+        // Fallback: use inline twiml instead of webhook URL
+        try {
+          const call = await twilioClient.calls.create({
+            twiml: inlineTwiml,
+            to: toNumber,
+            from: TWILIO_FROM,
+            timeout: 30
+          });
+          console.log(`[SOS] ✅ Voice call initiated (inline TwiML) to ${toNumber} (SID: ${call.sid})`);
+          return { success: true, callSid: call.sid };
+        } catch (err2) {
+          console.error(`[SOS] ❌ Voice call fully failed:`, err2.message);
+          return { success: false, error: err2.message };
+        }
       }
     })();
 
     // --- CHANNEL 3: TWILIO SMS (if configured + phone contact) ---
     const smsPromise = (async () => {
-      const isPhone = contactType === 'phone' || /^\+?\d{10,15}$/.test(contact.replace(/[\s-]/g, ''));
+      const cleaned = contact.replace(/[\s\-()]/g, '');
+      const isPhone = contactType === 'phone' || /^(\+?91|0)?\d{10}$/.test(cleaned) || /^\+?\d{10,15}$/.test(cleaned);
       if (!isPhone || !twilioClient) return null;
 
-      const phoneNumber = contact.replace(/[\s-]/g, '');
-      const toNumber = phoneNumber.startsWith('+') ? phoneNumber : '+91' + phoneNumber;
+      // Normalize to E.164
+      let toNumber = cleaned;
+      if (toNumber.startsWith('0')) toNumber = toNumber.slice(1);
+      if (!toNumber.startsWith('+')) {
+        toNumber = toNumber.startsWith('91') && toNumber.length > 11
+          ? '+' + toNumber
+          : '+91' + toNumber;
+      }
 
       const smsBody = `🚨 VISIONBRIDGE SOS 🚨\n` +
         `Reason: ${reason || 'Emergency'}\n` +

@@ -421,21 +421,15 @@
         return;
       }
 
-      // ---- MULTI-CHANNEL SOS: fire all available channels ----
+      // ---- MULTI-CHANNEL SOS: server channels FIRST, dialer as fallback ----
       locEl.textContent = locText + ' \u2014 Sending SOS alerts...';
+      SpeechModule.speak('Sending emergency alerts now.', SpeechModule.PRIORITY.DANGER);
 
-      // For phone contacts: also trigger tel: link as immediate dialer fallback
-      if (contactType === 'phone') {
-        const callLink = document.createElement('a');
-        callLink.href = 'tel:' + contact.replace(/\s/g, '');
-        callLink.style.display = 'none';
-        document.body.appendChild(callLink);
-        callLink.click();
-        setTimeout(() => callLink.remove(), 1000);
-      }
-
-      // Send to server for automated channels (email / Twilio call / Twilio SMS)
+      // Send to server for automated channels (Twilio call + SMS + email)
+      let serverWorked = false;
+      let twilioCallWorked = false;
       try {
+        console.log('[SOS] Sending to server:', { contact, contactType, reason });
         const response = await fetch('/api/sos', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -447,41 +441,56 @@
           })
         });
         const result = await response.json();
+        console.log('[SOS] Server response:', result);
 
         if (result.success) {
+          serverWorked = true;
           const summary = result.summary || 'SOS sent!';
           locEl.textContent = locText + ' \u2014 \u2705 ' + summary;
           SpeechModule.speak(summary, SpeechModule.PRIORITY.DANGER);
 
-          // Show channel details
+          // Check if Twilio voice call specifically succeeded
+          if (result.channels && result.channels.call && result.channels.call.success) {
+            twilioCallWorked = true;
+          }
+
+          // Announce channel details
           if (result.channels) {
             const details = [];
-            if (result.channels.call?.success) details.push('Phone call placed');
+            if (result.channels.call?.success) details.push('Automated phone call placed');
             if (result.channels.sms?.success) details.push('SMS delivered');
             if (result.channels.email?.success) details.push('Email sent');
-            if (details.length > 1) {
+            if (details.length > 0) {
               SpeechModule.speak(details.join('. ') + '.', SpeechModule.PRIORITY.INFO);
             }
           }
         } else {
-          // Server channels failed — but tel: link may have opened the dialer
-          if (contactType === 'phone') {
-            locEl.textContent = locText + ' \u2014 Dialer opened. Server: ' + (result.error || 'failed');
-            SpeechModule.speak('Opening your phone dialer. Server alert failed: ' + (result.error || ''), SpeechModule.PRIORITY.DANGER);
-          } else {
-            locEl.textContent = locText + ' \u2014 Failed: ' + (result.error || 'Unknown error');
-            SpeechModule.speak('Failed to send SOS. ' + (result.error || ''), SpeechModule.PRIORITY.DANGER);
-          }
+          console.warn('[SOS] Server returned failure:', result.error);
+          locEl.textContent = locText + ' \u2014 Server: ' + (result.error || 'failed');
         }
-      } catch {
-        // Network error — tel: link is the only fallback
-        if (contactType === 'phone') {
-          locEl.textContent = locText + ' \u2014 Network error. Dialer opened as fallback.';
-          SpeechModule.speak('Network error. Opening phone dialer as emergency fallback.', SpeechModule.PRIORITY.DANGER);
-        } else {
-          locEl.textContent = locText + ' \u2014 Network error';
-          SpeechModule.speak('Network error. Could not send SOS.', SpeechModule.PRIORITY.DANGER);
-        }
+      } catch (err) {
+        console.error('[SOS] Network error:', err);
+        locEl.textContent = locText + ' \u2014 Network error sending SOS';
+      }
+
+      // FALLBACK: Open tel: dialer ONLY if Twilio call didn't work
+      if (contactType === 'phone' && !twilioCallWorked) {
+        console.log('[SOS] Twilio call did not succeed, opening tel: dialer as fallback');
+        SpeechModule.speak(
+          serverWorked ? 'Also opening your phone dialer.' : 'Opening phone dialer as emergency fallback.',
+          SpeechModule.PRIORITY.DANGER
+        );
+        const callLink = document.createElement('a');
+        callLink.href = 'tel:' + contact.replace(/\s/g, '');
+        callLink.style.display = 'none';
+        document.body.appendChild(callLink);
+        callLink.click();
+        setTimeout(() => callLink.remove(), 1000);
+      }
+
+      // If nothing worked at all
+      if (!serverWorked && contactType !== 'phone') {
+        SpeechModule.speak('All SOS channels failed. Please check your internet connection.', SpeechModule.PRIORITY.DANGER);
       }
     };
 
