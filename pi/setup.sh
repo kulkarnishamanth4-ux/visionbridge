@@ -48,14 +48,35 @@ cd "$(dirname "$0")"
 pip3 install --break-system-packages -r requirements.txt 2>/dev/null || \
     pip3 install -r requirements.txt
 
-# Download TFLite model (COCO-SSD MobileNet v2)
+# Download TFLite model (COCO-SSD MobileNet v1 quantized, ~4MB)
 echo "[7/8] Downloading object detection model..."
 mkdir -p models
 if [ ! -f models/coco_ssd_mobilenet_v2.tflite ]; then
-    wget -q -O models/coco_ssd_mobilenet_v2.tflite \
-        "https://storage.googleapis.com/download.tensorflow.org/models/tflite/coco_ssd_mobilenet_v1_1.0_quant_2018_06_29.zip" \
-        2>/dev/null || echo "  (Download TFLite model manually if this fails)"
+    echo "  Downloading COCO-SSD MobileNet model..."
+    wget -q -O /tmp/coco_ssd.zip \
+        "https://storage.googleapis.com/download.tensorflow.org/models/tflite/coco_ssd_mobilenet_v1_1.0_quant_2018_06_29.zip"
+    if [ -f /tmp/coco_ssd.zip ]; then
+        unzip -o /tmp/coco_ssd.zip -d /tmp/coco_ssd/ 2>/dev/null
+        # Find the .tflite file and copy it
+        find /tmp/coco_ssd/ -name "*.tflite" -exec cp {} models/coco_ssd_mobilenet_v2.tflite \; 2>/dev/null
+        rm -rf /tmp/coco_ssd.zip /tmp/coco_ssd/
+        if [ -f models/coco_ssd_mobilenet_v2.tflite ]; then
+            echo "  ✅ Model downloaded successfully"
+        else
+            echo "  ⚠️  Model extraction failed. Download manually."
+        fi
+    else
+        echo "  ⚠️  Download failed. Check internet connection."
+    fi
+else
+    echo "  Model already exists, skipping."
 fi
+
+# Install tflite-runtime (lightweight, no full TensorFlow needed)
+echo "  Installing TFLite runtime..."
+pip3 install --break-system-packages tflite-runtime 2>/dev/null || \
+    pip3 install tflite-runtime 2>/dev/null || \
+    echo "  ⚠️  tflite-runtime install failed. Offline detection disabled."
 
 # Create COCO labels file
 cat > models/coco_labels.txt << 'EOF'

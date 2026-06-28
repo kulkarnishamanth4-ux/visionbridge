@@ -30,6 +30,7 @@ import ai
 import commands
 import sensors
 import sos
+import detector
 from config import COMMAND_TIMEOUT
 
 
@@ -66,16 +67,23 @@ def init_all():
         return False
 
     # AI
-    log.info("[3/6] Initializing Gemini AI...")
+    log.info("[3/7] Initializing Gemini AI...")
     if not ai.init():
         log.warning("Gemini AI not available — will work offline only")
 
+    # Offline detector
+    log.info("[4/7] Loading offline detector...")
+    if detector.init():
+        log.info("TFLite offline detector ready")
+    else:
+        log.info("TFLite not available — online-only mode")
+
     # SOS
-    log.info("[4/6] Initializing SOS system...")
+    log.info("[5/7] Initializing SOS system...")
     sos.init()
 
     # Hardware sensors
-    log.info("[5/6] Initializing sensors...")
+    log.info("[6/7] Initializing sensors...")
     buzzer = sensors.Buzzer()
 
     # Ultrasonic sensors
@@ -93,7 +101,7 @@ def init_all():
         gps.start()
 
     # Buttons
-    log.info("[6/6] Registering buttons...")
+    log.info("[7/7] Registering buttons...")
     buttons = sensors.Buttons()
     buttons.register(
         sos_callback=handle_sos_button,
@@ -213,7 +221,7 @@ def handle_command(action, text):
 
 
 def do_scan(mode="detailed"):
-    """Capture frame and analyze with Gemini."""
+    """Capture frame and analyze with Gemini, fallback to TFLite offline."""
     global last_response
     voice_engine.speak("Scanning...")
 
@@ -224,13 +232,26 @@ def do_scan(mode="detailed"):
 
     result = ai.analyze_scene(frame, mode)
 
+    # Check if Gemini actually failed (returned placeholder text)
+    is_offline = "AI service unavailable" in result.get("description", "")
+
+    if is_offline and detector.is_ready():
+        # Fallback: use TFLite local detection
+        log.info("Gemini unavailable — using offline TFLite detector")
+        raw_frame = camera.capture_raw()
+        if raw_frame is not None:
+            detections = detector.detect(raw_frame)
+            response = detector.describe_detections(detections)
+            voice_engine.speak(response)
+            last_response = response
+            return
+
     # Build response
     if mode == "danger":
         response = result.get("summary", "No dangers detected.")
     elif mode == "summary":
         response = result.get("summary", "Scene analyzed.")
     else:
-        # Detailed: read description, then summary
         desc = result.get("description", "")
         summary = result.get("summary", "")
         response = desc if desc else summary
