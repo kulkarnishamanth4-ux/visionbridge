@@ -1,0 +1,27 @@
+# VisionBridge Pi — Python Dependencies
+# Install with: pip3 install -r requirements.txt
+
+# Speech recognition (Google Speech API)
+SpeechRecognition>=3.10.0
+PyAudio>=0.2.14
+
+# Text-to-speech (offline, uses espeak)
+pyttsx3>=2.90
+
+# Camera (Pillow for image processing)
+Pillow>=10.0
+
+# Gemini AI
+google-genai>=1.0.0
+
+# Twilio (SOS calls + SMS)
+twilio>=9.0.0
+
+# GPIO (installed by default on Pi OS, but listed for completeness)
+# RPi.GPIO>=0.7.1
+
+# GPS serial
+pyserial>=3.5
+
+# OpenCV (fallback camera, optional)
+# opencv-python-headless>=4.8.0
