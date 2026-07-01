@@ -70,3 +70,9 @@ DETECTION_THRESHOLD = 0.4
 
 # ─── SYSTEM ───
 LOG_LEVEL = "INFO"
+
+# Load local overrides if present (not tracked by Git)
+try:
+    from config_local import *
+except ImportError:
+    pass

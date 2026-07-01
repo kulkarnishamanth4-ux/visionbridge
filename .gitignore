@@ -7,3 +7,13 @@ android/app/build/
 android/.gradle/
 android/build/
 android/local.properties
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+pi/models/
+pi/config_local.py
+/tmp/
