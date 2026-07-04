@@ -112,10 +112,38 @@ def _extract_json(text):
     return None
 
 
+# ─── RATE LIMITER ───
+_last_call_time = 0
+_MIN_CALL_INTERVAL = 2.0  # minimum seconds between API calls
+
+def _extract_retry_delay(error_msg):
+    """Parse the retry delay from a Gemini 429 error message."""
+    try:
+        # Look for "Please retry in 13.273850372s"
+        match = re.search(r'retry in ([\d.]+)s', str(error_msg))
+        if match:
+            return float(match.group(1))
+        # Look for retryDelay field
+        match = re.search(r"'retryDelay':\s*'(\d+)s'", str(error_msg))
+        if match:
+            return float(match.group(1))
+    except Exception:
+        pass
+    return None
+
+
 def _call_gemini(system_prompt, user_text, image_b64=None, max_tokens=1024):
-    """Make a Gemini API call with fallback model."""
+    """Make a Gemini API call with retry logic and rate limiting."""
+    global _last_call_time
     if not _client:
         return None
+
+    # Rate limiter: enforce minimum interval between calls
+    now = time.time()
+    wait = _MIN_CALL_INTERVAL - (now - _last_call_time)
+    if wait > 0:
+        log.debug(f"Rate limiter: waiting {wait:.1f}s")
+        time.sleep(wait)
 
     # Build parts
     parts = []
@@ -134,17 +162,31 @@ def _call_gemini(system_prompt, user_text, image_b64=None, max_tokens=1024):
         }
     }
 
-    # Try primary model, then fallback
-    for model_name in [GEMINI_MODEL, GEMINI_FALLBACK]:
-        try:
-            response = _client.models.generate_content(
-                model=model_name, **request_config
-            )
-            return response.text.strip()
-        except Exception as e:
-            log.warning(f"Gemini {model_name} failed: {e}")
-            time.sleep(0.5)
+    # Try models in order, with retry on rate limit
+    models_to_try = [GEMINI_MODEL, GEMINI_FALLBACK, "gemini-2.5-flash"]
+    for model_name in models_to_try:
+        for attempt in range(2):  # max 2 attempts per model
+            try:
+                _last_call_time = time.time()
+                response = _client.models.generate_content(
+                    model=model_name, **request_config
+                )
+                return response.text.strip()
+            except Exception as e:
+                err_str = str(e)
+                is_rate_limit = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
 
+                if is_rate_limit:
+                    delay = _extract_retry_delay(err_str) or (15 * (attempt + 1))
+                    log.warning(f"Gemini {model_name} rate limited (attempt {attempt+1}). "
+                                f"Waiting {delay:.0f}s before retry...")
+                    time.sleep(delay)
+                    continue  # retry same model
+                else:
+                    log.warning(f"Gemini {model_name} failed (non-retryable): {e}")
+                    break  # move to next model
+
+    log.error("All Gemini models exhausted. Using offline fallback.")
     return None
 
 
