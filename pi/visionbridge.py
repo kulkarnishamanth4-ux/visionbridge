@@ -52,13 +52,13 @@ def init_all():
     log.info("=" * 50)
 
     # Camera
-    log.info("[1/6] Initializing camera...")
+    log.info("[1/7] Initializing camera...")
     if not camera.init():
         log.error("Camera init failed! Check connection.")
         return False
 
     # Voice
-    log.info("[2/6] Initializing voice engine...")
+    log.info("[2/7] Initializing voice engine...")
     voice_engine = voice_module.VoiceEngine()
     try:
         voice_engine.init()
@@ -359,8 +359,6 @@ def main_loop():
                 if proximity:
                     proximity.enabled = False
 
-                # Step 3: Pre-capture frame (while user is still talking)
-                pre_frame = camera.capture_frame()
 
                 # Step 4: Listen for command
                 command_text = voice_engine.listen_for_command(COMMAND_TIMEOUT)

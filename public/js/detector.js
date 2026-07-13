@@ -91,8 +91,6 @@ const DetectorModule = (() => {
   }
 
   // =============================================
-  //   DISTANCE ESTIMATION — Class-aware pinhole model
-  // =============================================
   //   DISTANCE ESTIMATION — Hybrid: pinhole + fill-based
   //   Pinhole model is accurate in the mid-range (1-10m) but
   //   breaks down at extremes:
