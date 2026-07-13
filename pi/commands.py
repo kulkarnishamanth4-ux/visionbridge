@@ -12,33 +12,33 @@ log = logging.getLogger("commands")
 # ─── COMMAND DEFINITIONS ───
 # Each command has: action name, list of trigger phrases
 COMMANDS = {
-    "scan": [
-        # English
-        "what do you see", "what's around", "what is around", "describe",
-        "look around", "scan", "scene", "what's there", "tell me what you see",
-        "check around", "what's in front", "what is in front",
-        "where am i", "what's happening", "analyze",
+    "time": [
+        "what time is it", "what time", "what's the time", "current time",
+        "time please", "tell me the time",
         # Hindi
-        "dekho", "dekhiye", "kya hai", "kya dikh raha", "batao",
-        "aas paas kya hai", "samne kya hai", "dikhao",
+        "samay kya hai", "kitne baje", "time kya hai",
         # Kannada
-        "nodi", "nodri", "yenu ide", "heli", "yenu kanuttide",
+        "samaya yeshtu", "time yeshtu",
     ],
-    "read": [
-        "read", "read this", "what does it say", "read the text",
-        "read that sign", "what's written", "what is written",
+    "date": [
+        "date", "what's the date", "what day", "today's date",
+        "tell me the date", "what date is it",
         # Hindi
-        "padho", "padh do", "kya likha hai", "kya likha",
+        "aaj kya date", "aaj kya taareekh", "kya din hai",
         # Kannada
-        "odi", "odu", "yenu baredide",
+        "indu yenu date", "indu yenu dinanka",
     ],
-    "measure": [
-        "measure", "how far", "how big", "how tall", "distance",
-        "how close", "size", "dimensions", "how far is",
+    "location": [
+        "location", "where am i", "my location", "gps",
+        "what's my location", "where are we",
         # Hindi
-        "kitna door", "kitna bada", "kitna paas", "naap",
+        "kahan hun", "meri jagah", "kahan hun main",
         # Kannada
-        "yeshtu doora", "yeshtu dodda",
+        "naanu yelli", "yelli iddini",
+    ],
+    "battery": [
+        "battery", "power level", "charge level", "how much battery",
+        "battery status",
     ],
     "sos": [
         "help", "help me", "emergency", "sos", "danger",
@@ -58,36 +58,41 @@ COMMANDS = {
         "nilsi", "nillsu", "saku", "saku maadi",
     ],
     "repeat": [
-        "repeat", "say again", "come again", "once more", "what",
+        "repeat", "say again", "come again", "once more",
         "didn't hear", "say that again", "repeat that",
+        "what did you say", "pardon",
         # Hindi
         "phir se bolo", "dobara bolo", "fir se",
         # Kannada
         "matte heli", "innomme heli",
     ],
-    "time": [
-        "time", "what time", "what's the time", "current time",
+    "read": [
+        "read", "read this", "what does it say", "read the text",
+        "read that sign", "what's written", "what is written",
         # Hindi
-        "samay kya hai", "kitne baje", "time kya hai",
+        "padho", "padh do", "kya likha hai", "kya likha",
         # Kannada
-        "samaya yeshtu", "time yeshtu",
+        "odi", "odu", "yenu baredide",
     ],
-    "date": [
-        "date", "what's the date", "what day", "today's date",
+    "measure": [
+        "measure", "how far", "how big", "how tall", "distance",
+        "how close", "size", "dimensions", "how far is",
         # Hindi
-        "aaj kya date", "aaj kya taareekh", "kya din hai",
+        "kitna door", "kitna bada", "kitna paas", "naap",
         # Kannada
-        "indu yenu date", "indu yenu dinanka",
+        "yeshtu doora", "yeshtu dodda",
     ],
-    "battery": [
-        "battery", "power", "charge", "how much battery",
-    ],
-    "location": [
-        "location", "where am i", "my location", "gps",
+    "scan": [
+        # English
+        "what do you see", "what's around", "what is around", "describe",
+        "look around", "scan", "scene", "what's there", "tell me what you see",
+        "check around", "what's in front", "what is in front",
+        "what's happening", "analyze",
         # Hindi
-        "kahan hun", "meri jagah", "kahan hun main",
+        "dekho", "dekhiye", "kya hai", "kya dikh raha", "batao",
+        "aas paas kya hai", "samne kya hai", "dikhao",
         # Kannada
-        "naanu yelli", "yelli iddini",
+        "nodi", "nodri", "yenu ide", "heli", "yenu kanuttide",
     ],
 }
 
