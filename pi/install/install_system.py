@@ -51,12 +51,61 @@ PACKAGE_GROUPS = {
 }
 
 
+def repair_dpkg_if_corrupted():
+    """
+    Self-healing routine: Scans /var/lib/dpkg/info for corrupted .list or .triggers files
+    (empty, missing trailing newline, or binary null bytes) and safely removes them,
+    then repairs dpkg state automatically.
+    """
+    import glob
+    import os
+
+    log.info("Running pre-flight dpkg health check...")
+    info_dir = "/var/lib/dpkg/info"
+    if not os.path.exists(info_dir):
+        return
+
+    corrupted_files = []
+    # Check .list and .triggers files
+    for pattern in ["*.list", "*.triggers"]:
+        for filepath in glob.glob(os.path.join(info_dir, pattern)):
+            try:
+                size = os.path.getsize(filepath)
+                if size == 0:
+                    corrupted_files.append(filepath)
+                    continue
+
+                with open(filepath, "rb") as f:
+                    content = f.read()
+                    # Check for binary nulls or missing trailing newline
+                    if b"\x00" in content or (content and not content.endswith(b"\n")):
+                        corrupted_files.append(filepath)
+            except Exception:
+                pass
+
+    if corrupted_files:
+        log.warning(f"Found {len(corrupted_files)} corrupted dpkg metadata file(s). Auto-repairing...")
+        for filepath in corrupted_files:
+            log.info(f"  Removing corrupted metadata: {os.path.basename(filepath)}")
+            _run_cmd(["sudo", "rm", "-f", filepath])
+
+        log.info("Fixing broken packages and configuring dpkg...")
+        _run_cmd(["sudo", "dpkg", "--configure", "-a"])
+        _run_cmd(["sudo", "apt-get", "--fix-broken", "install", "-y"])
+        log.info("✅ DPKG auto-repair complete!")
+    else:
+        log.info("  DPKG database health: OK")
+
+
 def install(system_info):
     """
     Install all system package groups.
     Returns a dict of { group_name: True/False } indicating success.
     """
     results = {}
+
+    # Run pre-flight self-healing dpkg check
+    repair_dpkg_if_corrupted()
 
     # First, update package lists
     log.info("Updating package lists...")
@@ -100,9 +149,9 @@ def install(system_info):
                 results[group_name] = False
             continue
 
-        # Install
+        # Install with --no-install-recommends to avoid GUI bloat & memory crashes
         log.info(f"Installing {desc}: {available}")
-        ok = _run_apt(["sudo", "apt-get", "install", "-y"] + available)
+        ok = _run_apt(["sudo", "apt-get", "install", "-y", "--no-install-recommends"] + available)
 
         if ok:
             log.info(f"  {desc}: OK")
@@ -122,6 +171,14 @@ def install(system_info):
                 log.warning(f"    NOT verified: {pkg}")
 
     return results
+
+
+def _run_cmd(cmd):
+    """Run a system command silently."""
+    try:
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120)
+    except Exception:
+        pass
 
 
 def _run_apt(cmd):
