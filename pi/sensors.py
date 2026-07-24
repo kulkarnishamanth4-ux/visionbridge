@@ -260,15 +260,17 @@ class Buttons:
 
 
 class ProximitySweep:
-    """Continuous ultrasonic monitoring with buzzer feedback."""
+    """Continuous ultrasonic monitoring with buzzer and voice feedback."""
 
-    def __init__(self, left_sensor, right_sensor, buzzer):
+    def __init__(self, left_sensor, right_sensor, buzzer, voice_engine=None):
         self.left = left_sensor
         self.right = right_sensor
         self.buzzer = buzzer
+        self.voice = voice_engine
         self._running = False
         self._thread = None
         self.enabled = True
+        self._last_spoken_time = 0
 
     def start(self):
         """Start background proximity monitoring."""
@@ -299,11 +301,20 @@ class ProximitySweep:
             elif dr > 0:
                 closest, direction = dr, "right"
 
+            now = time.time()
             if closest > 0 and closest < ULTRA_DANGER_CM:
-                self.buzzer.danger_beep()
+                if self.buzzer:
+                    self.buzzer.danger_beep()
                 log.warning(f"PROXIMITY DANGER: {closest:.0f}cm to {direction}")
+                if self.voice and (now - self._last_spoken_time > 3.0):
+                    self._last_spoken_time = now
+                    self.voice.speak(f"Warning! Obstacle {closest:.0f} centimeters to {direction}")
             elif closest > 0 and closest < ULTRA_WARNING_CM:
-                self.buzzer.beep(0.05)
+                if self.buzzer:
+                    self.buzzer.beep(0.05)
+                if self.voice and (now - self._last_spoken_time > 5.0):
+                    self._last_spoken_time = now
+                    self.voice.speak(f"Obstacle {closest:.0f} centimeters to {direction}")
 
             time.sleep(ULTRA_POLL_INTERVAL)
 

@@ -93,7 +93,7 @@ def init_all():
     ultra_right = sensors.UltrasonicSensor(
         sensors.PIN_ULTRA_R_TRIG, sensors.PIN_ULTRA_R_ECHO, "right"
     )
-    proximity = sensors.ProximitySweep(ultra_left, ultra_right, buzzer)
+    proximity = sensors.ProximitySweep(ultra_left, ultra_right, buzzer, voice_engine)
 
     # GPS
     gps = sensors.GPS()
