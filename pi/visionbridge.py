@@ -387,16 +387,18 @@ def main_loop():
 def shutdown(signum=None, frame=None):
     """Clean shutdown on SIGTERM/SIGINT."""
     log.info("Shutting down VisionBridge...")
-    if voice_engine:
-        voice_engine.speak("VisionBridge shutting down. Goodbye.")
-    if proximity:
-        proximity.stop()
-    if gps:
-        gps.stop()
-    camera.stop()
-    sensors.cleanup()
+    try:
+        if proximity:
+            proximity.stop()
+        if gps:
+            gps.stop()
+        camera.stop()
+        sensors.cleanup()
+    except Exception as e:
+        log.debug(f"Shutdown cleanup error: {e}")
     log.info("Goodbye!")
-    sys.exit(0)
+    import os
+    os._exit(0)
 
 
 if __name__ == "__main__":
