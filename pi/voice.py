@@ -91,9 +91,9 @@ class VoiceEngine:
             self.microphone = sr.Microphone()
             log.info("Microphone initialized")
         except Exception as e:
-            log.error(f"Microphone init failed: {e}")
-            log.info("Available mics: %s", sr.Microphone.list_microphone_names())
-            raise
+            log.warning(f"Microphone hardware not found: {e}")
+            log.warning("Voice recognition disabled. Speaker output (TTS) and Camera AI remain FULLY ACTIVE.")
+            self.microphone = None
 
         try:
             self.tts_engine = pyttsx3.init()
@@ -113,6 +113,9 @@ class VoiceEngine:
 
     def calibrate(self):
         """Calibrate mic for ambient noise (call once at startup)."""
+        if not self.microphone:
+            log.info("Skipping mic calibration (no microphone hardware).")
+            return
         log.info("Calibrating microphone for ambient noise (2 seconds)...")
         try:
             with self.microphone as source:
@@ -145,6 +148,9 @@ class VoiceEngine:
         Listen continuously until wake word is detected.
         Returns True when wake word heard, False on timeout/error.
         """
+        if not self.microphone:
+            time.sleep(1)
+            return False
         log.debug("Listening for wake word...")
         try:
             with self.microphone as source:
@@ -172,6 +178,8 @@ class VoiceEngine:
         Listen for a voice command after wake word.
         Returns the recognized text, or None on timeout/silence.
         """
+        if not self.microphone:
+            return None
         effective_timeout = timeout or COMMAND_TIMEOUT
         log.debug(f"Listening for command ({effective_timeout}s)...")
         try:
