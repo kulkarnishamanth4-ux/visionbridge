@@ -335,46 +335,47 @@ def do_ask(question):
 
 def main_loop():
     """
-    The core voice-first control loop:
-    1. Listen for wake word
-    2. Beep to confirm
-    3. Listen for command (3s timeout)
-    4. If silence → auto-scan
-    5. If command → execute
-    6. Beep when ready again
+    The core control loop:
+    - If microphone is present: Listen for "Hey Vision" wake word.
+    - If microphone is NOT present: Automatically scan camera every 10s and announce objects.
+    - Physical SOS & Mode buttons always work via background interrupts.
     """
-    log.info("Entering main loop — listening for 'Hey Vision'...")
-    voice_engine.speak("VisionBridge ready. Say Hey Vision to start.")
+    log.info("Entering main loop...")
+    if voice_engine and not voice_engine.microphone:
+        voice_engine.speak("VisionBridge ready in Auto Scan mode. Scanning camera every 10 seconds.")
+    else:
+        voice_engine.speak("VisionBridge ready. Say Hey Vision to start.")
+
+    last_auto_scan = 0
+    AUTO_SCAN_INTERVAL = 10  # Seconds between camera scans when mic is absent
 
     while True:
         try:
-            # Step 1: Listen for wake word (blocks until heard)
-            if voice_engine.listen_for_wake_word():
+            # Case A: Microphone attached — listen for wake word
+            if voice_engine and voice_engine.microphone:
+                if voice_engine.listen_for_wake_word():
+                    if buzzer:
+                        buzzer.double_beep()
+                    if proximity:
+                        proximity.enabled = False
 
-                # Step 2: Confirm with buzzer
-                if buzzer:
-                    buzzer.double_beep()
+                    command_text = voice_engine.listen_for_command(COMMAND_TIMEOUT)
+                    action, text = commands.classify_command(command_text)
+                    handle_command(action, text)
 
-                # Temporarily disable proximity beeping (so it doesn't interfere)
-                if proximity:
-                    proximity.enabled = False
-
-
-                # Step 4: Listen for command
-                command_text = voice_engine.listen_for_command(COMMAND_TIMEOUT)
-
-                # Step 5: Classify and execute
-                action, text = commands.classify_command(command_text)
-                handle_command(action, text)
-
-                # Step 6: Ready beep
-                time.sleep(0.3)
-                if buzzer:
-                    buzzer.beep(0.08)
-
-                # Re-enable proximity
-                if proximity:
-                    proximity.enabled = True
+                    time.sleep(0.3)
+                    if buzzer:
+                        buzzer.beep(0.08)
+                    if proximity:
+                        proximity.enabled = True
+            else:
+                # Case B: No Microphone — Auto-scan camera every 10 seconds
+                now = time.time()
+                if now - last_auto_scan >= AUTO_SCAN_INTERVAL:
+                    last_auto_scan = now
+                    log.info("Auto-scanning camera scene...")
+                    do_scan(current_mode)
+                time.sleep(1)
 
         except KeyboardInterrupt:
             break
