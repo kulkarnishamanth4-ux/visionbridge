@@ -97,15 +97,16 @@ class VoiceEngine:
 
         try:
             self.tts_engine = pyttsx3.init()
-            # Configure voice — use a clear, medium-speed voice
             self.tts_engine.setProperty("rate", 160)
             self.tts_engine.setProperty("volume", 1.0)
-            # Try to find an English voice
-            voices = self.tts_engine.getProperty("voices")
-            for v in voices:
-                if "english" in v.name.lower() or "en" in v.id.lower():
-                    self.tts_engine.setProperty("voice", v.id)
-                    break
+            try:
+                voices = self.tts_engine.getProperty("voices")
+                for v in voices:
+                    if "english" in v.name.lower() or "en" in v.id.lower():
+                        self.tts_engine.setProperty("voice", v.id)
+                        break
+            except Exception as ve:
+                log.warning(f"Could not set custom voice ID (using default): {ve}")
             log.info("TTS engine initialized")
         except Exception as e:
             log.error(f"TTS init failed: {e}")
