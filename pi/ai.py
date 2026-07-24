@@ -177,14 +177,11 @@ def _call_gemini(system_prompt, user_text, image_b64=None, max_tokens=1024):
                 is_rate_limit = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
 
                 if is_rate_limit:
-                    delay = _extract_retry_delay(err_str) or (15 * (attempt + 1))
-                    log.warning(f"Gemini {model_name} rate limited (attempt {attempt+1}). "
-                                f"Waiting {delay:.0f}s before retry...")
-                    time.sleep(delay)
-                    continue  # retry same model
+                    log.warning(f"Gemini free tier rate limited (429). Skipping sleep and switching to offline TFLite detector.")
+                    break  # Return None immediately so system uses offline TFLite detector without lag
                 else:
-                    log.warning(f"Gemini {model_name} failed (non-retryable): {e}")
-                    break  # move to next model
+                    log.warning(f"Gemini {model_name} failed: {e}")
+                    break
 
     log.error("All Gemini models exhausted. Using offline fallback.")
     return None
