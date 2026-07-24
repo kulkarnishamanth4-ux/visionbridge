@@ -99,18 +99,10 @@ class VoiceEngine:
             self.tts_engine = pyttsx3.init()
             self.tts_engine.setProperty("rate", 160)
             self.tts_engine.setProperty("volume", 1.0)
-            try:
-                voices = self.tts_engine.getProperty("voices")
-                for v in voices:
-                    if "english" in v.name.lower() or "en" in v.id.lower():
-                        self.tts_engine.setProperty("voice", v.id)
-                        break
-            except Exception as ve:
-                log.warning(f"Could not set custom voice ID (using default): {ve}")
-            log.info("TTS engine initialized")
+            log.info("TTS engine (pyttsx3) initialized")
         except Exception as e:
-            log.error(f"TTS init failed: {e}")
-            raise
+            log.warning(f"pyttsx3 engine init warning ({e}). Using direct espeak TTS fallback.")
+            self.tts_engine = "espeak_cli"
 
     def calibrate(self):
         """Calibrate mic for ambient noise (call once at startup)."""
@@ -128,14 +120,18 @@ class VoiceEngine:
 
     def speak(self, text, block=True):
         """Speak text through earphones. Thread-safe."""
-        if not text or not self.tts_engine:
+        if not text:
             return
         log.info(f"Speaking: {text[:80]}...")
         self._speaking = True
         try:
             with self.tts_lock:
-                self.tts_engine.say(text)
-                self.tts_engine.runAndWait()
+                if self.tts_engine == "espeak_cli":
+                    import subprocess
+                    subprocess.run(["espeak", "-v", "en", text], check=False)
+                elif self.tts_engine:
+                    self.tts_engine.say(text)
+                    self.tts_engine.runAndWait()
         except Exception as e:
             log.warning(f"TTS error: {e}")
         finally:
