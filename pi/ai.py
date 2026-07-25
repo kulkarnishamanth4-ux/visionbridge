@@ -169,7 +169,7 @@ def _call_gemini(system_prompt, user_text, image_b64=None, max_tokens=1024):
     }
 
     # Try models in order, with retry on rate limit
-    models_to_try = [GEMINI_MODEL, GEMINI_FALLBACK, "gemini-2.5-flash"]
+    models_to_try = [GEMINI_MODEL, GEMINI_FALLBACK, "gemini-1.5-flash", "gemini-1.5-flash-8b"]
     for model_name in models_to_try:
         for attempt in range(2):  # max 2 attempts per model
             try:
@@ -183,8 +183,9 @@ def _call_gemini(system_prompt, user_text, image_b64=None, max_tokens=1024):
                 is_rate_limit = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
 
                 if is_rate_limit:
-                    log.warning(f"Gemini free tier rate limited (429). Skipping sleep and switching to offline TFLite detector.")
-                    break  # Return None immediately so system uses offline TFLite detector without lag
+                    log.warning(f"Gemini {model_name} rate limited (429). Retrying next model in 2s...")
+                    time.sleep(2)
+                    break
                 else:
                     log.warning(f"Gemini {model_name} failed: {e}")
                     break
