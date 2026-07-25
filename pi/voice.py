@@ -128,7 +128,11 @@ class VoiceEngine:
             with self.tts_lock:
                 if self.tts_engine == "espeak_cli":
                     import subprocess
-                    subprocess.run(["espeak", "-v", "en", text], check=False)
+                    # Pipe espeak to aplay for universal ALSA / USB soundcard compatibility
+                    subprocess.run(
+                        f'espeak -v en "{text}" --stdout | aplay 2>/dev/null',
+                        shell=True, check=False
+                    )
                 elif self.tts_engine:
                     self.tts_engine.say(text)
                     self.tts_engine.runAndWait()
