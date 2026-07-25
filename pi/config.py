@@ -5,6 +5,14 @@ Copy this file to config_local.py and fill in your API keys.
 """
 import os
 
+# Auto-fix SSL Root Certificates for HTTPS requests (Gemini AI & Twilio)
+try:
+    import certifi
+    os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+    os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
+except ImportError:
+    pass
+
 # ─── API KEYS (set via environment variables or edit directly) ───
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "YOUR_GEMINI_API_KEY_HERE")
 TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID", "")
