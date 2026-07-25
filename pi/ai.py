@@ -8,7 +8,10 @@ import time
 import json
 import re
 
-from google import genai
+try:
+    from google import genai
+except Exception as e:
+    genai = None
 
 from config import GEMINI_API_KEY, GEMINI_MODEL, GEMINI_FALLBACK
 
@@ -21,6 +24,9 @@ _last_response_cache = {}
 def init():
     """Initialize Gemini client."""
     global _client
+    if genai is None:
+        log.error("google-genai module not available")
+        return False
     if not GEMINI_API_KEY or GEMINI_API_KEY == "YOUR_GEMINI_API_KEY_HERE":
         log.error("Gemini API key not set! Edit config.py")
         return False
