@@ -79,8 +79,8 @@ def init():
         log.info(f"TFLite model loaded. Input shape: {_input_shape}")
         _is_ready = True
         return True
-    except Exception as e:
-        log.error(f"TFLite init failed: {e}")
+    except BaseException as e:
+        log.warning(f"TFLite hardware load skipped on this CPU ({e}). Online Gemini AI mode active.")
         return False
 
 
