@@ -302,6 +302,9 @@ class ProximitySweep:
                 closest, direction = dr, "right"
 
             now = time.time()
+            if closest > 0:
+                log.info(f"Ultrasonic distance: {closest:.0f} cm ({direction}) | Left: {dl:.0f}cm | Right: {dr:.0f}cm")
+
             if closest > 0 and closest < ULTRA_DANGER_CM:
                 if self.buzzer:
                     self.buzzer.danger_beep()

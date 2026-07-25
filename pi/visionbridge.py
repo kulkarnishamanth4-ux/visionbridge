@@ -221,32 +221,59 @@ def handle_command(action, text):
 
 
 def do_scan(mode="detailed"):
-    """Capture frame and analyze with Gemini, fallback to TFLite offline."""
+    """Capture frame and analyze with Gemini, fallback to TFLite or Ultrasonic sensors offline."""
     global last_response
     voice_engine.speak("Scanning...")
 
+    # Read ultrasonic sensors first
+    ultra_text = ""
+    if proximity:
+        dl, dr = proximity.get_distances()
+        ultra_parts = []
+        if dl > 0:
+            ultra_parts.append(f"Left sensor {dl:.0f} cm")
+        if dr > 0:
+            ultra_parts.append(f"Right sensor {dr:.0f} cm")
+        if ultra_parts:
+            ultra_text = "Obstacle distance: " + ", ".join(ultra_parts) + "."
+        else:
+            ultra_text = "Path clear ahead."
+
     frame = camera.capture_frame()
     if not frame:
-        voice_engine.speak("Camera is not available.")
+        response = f"Camera unavailable. {ultra_text}"
+        log.info(f"Scan result: {response}")
+        voice_engine.speak(response)
+        last_response = response
         return
 
     result = ai.analyze_scene(frame, mode)
 
-    # Check if Gemini actually failed (returned placeholder text)
-    is_offline = "AI service unavailable" in result.get("description", "")
+    # Check if Gemini actually failed (returned placeholder or error)
+    is_offline = "AI service unavailable" in result.get("description", "") or "Could not analyze" in result.get("description", "")
 
-    if is_offline and detector.is_ready():
-        # Fallback: use TFLite local detection
-        log.info("Gemini unavailable — using offline TFLite detector")
-        raw_frame = camera.capture_raw()
-        if raw_frame is not None:
-            detections = detector.detect(raw_frame)
-            response = detector.describe_detections(detections)
-            voice_engine.speak(response)
-            last_response = response
-            return
+    if is_offline:
+        if detector.is_ready():
+            log.info("Gemini unavailable — using offline TFLite detector")
+            raw_frame = camera.capture_raw()
+            if raw_frame is not None:
+                detections = detector.detect(raw_frame)
+                response = detector.describe_detections(detections)
+                if ultra_text:
+                    response += " " + ultra_text
+                log.info(f"Offline TFLite detection result: {response}")
+                voice_engine.speak(response)
+                last_response = response
+                return
 
-    # Build response
+        # Fallback when both Gemini and TFLite are unavailable
+        response = f"AI offline mode active. {ultra_text}"
+        log.info(f"Offline fallback scan result: {response}")
+        voice_engine.speak(response)
+        last_response = response
+        return
+
+    # Build response from Gemini
     if mode == "danger":
         response = result.get("summary", "No dangers detected.")
     elif mode == "summary":
@@ -266,6 +293,7 @@ def do_scan(mode="detailed"):
         time.sleep(0.3)
 
     if response:
+        log.info(f"Gemini scan result: {response}")
         voice_engine.speak(response)
         last_response = response
 
@@ -347,7 +375,7 @@ def main_loop():
         voice_engine.speak("VisionBridge ready. Say Hey Vision to start.")
 
     last_auto_scan = 0
-    AUTO_SCAN_INTERVAL = 10  # Seconds between camera scans when mic is absent
+    AUTO_SCAN_INTERVAL = 15  # Seconds between camera scans when mic is absent
 
     while True:
         try:
